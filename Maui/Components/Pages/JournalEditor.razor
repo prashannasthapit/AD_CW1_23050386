@@ -1,0 +1,74 @@
+@page "/editor"
+@using Application.Interfaces
+@using Domain.Entities
+
+<h3>Daily Journal</h3>
+
+<input type="date"
+       @bind="_entryDate"
+       @bind:event="onchange"
+       @bind:after="OnDateChanged" />
+
+<select @bind="_primaryMood">
+    @foreach (var m in Enum.GetValues(typeof(Mood)).Cast<Mood>())
+    {
+        <option value="@m">@m</option>
+    }
+</select>
+
+<textarea rows="16" style="width:100%;" @bind="_content"></textarea>
+<button @onclick="Save">Save</button>
+
+@code {
+    [Inject]
+    public IJournalService JournalService { get; set; } = null!;
+
+    private DateTime _entryDate = DateTime.Today;
+    private string _title = string.Empty;
+    private string _content = string.Empty;
+    private Mood _primaryMood = Mood.Thoughtful;
+    private JournalEntry? _current;
+    private string _statusMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForDate(_entryDate);
+    }
+
+    private async Task OnDateChanged()
+    {
+        await LoadForDate(_entryDate);
+    }
+
+    private async Task LoadForDate(DateTime date)
+    {
+        _current = await JournalService.GetEntryByDateAsync(date);
+        if (_current != null)
+        {
+            _title = _current.Title;
+            _content = _current.Content;
+            _primaryMood = _current.PrimaryMood;
+        }
+        else
+        {
+            _title = string.Empty;
+            _content = string.Empty;
+            _primaryMood = Mood.Thoughtful;
+        }
+    }
+
+    private async Task Save()
+    {
+        var entry = new JournalEntry
+        {
+            EntryDate = _entryDate.Date,
+            Title = _title,
+            Content = _content,
+            IsMarkdown = true,
+            PrimaryMood = _primaryMood
+        };
+
+        await JournalService.AddOrUpdateEntryAsync(entry);
+        _statusMessage = "Saved";
+    }
+}
