@@ -1,4 +1,4 @@
-﻿namespace AD_CW1_23050386;
+﻿namespace Maui;
 
 public partial class MainPage : ContentPage
 {

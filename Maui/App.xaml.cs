@@ -1,4 +1,4 @@
-﻿namespace AD_CW1_23050386;
+﻿namespace Maui;
 
 public partial class App : Application
 {
@@ -9,6 +9,6 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage()) { Title = "AD_CW1_23050386" };
+        return new Window(new MainPage()) { Title = "Maui" };
     }
 }

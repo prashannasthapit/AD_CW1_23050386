@@ -1,6 +1,6 @@
 ﻿using Foundation;
 
-namespace AD_CW1_23050386;
+namespace Maui;
 
 [Register("AppDelegate")]
 public class AppDelegate : MauiUIApplicationDelegate
