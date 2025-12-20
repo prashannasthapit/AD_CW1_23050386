@@ -1,3 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+    <ItemGroup Label="For Entities.">
+        <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    </ItemGroup>
+    
 </Project>

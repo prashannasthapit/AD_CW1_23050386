@@ -1,3 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
+  <ItemGroup>
+    <Folder Include="Dtos\" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\Domain.csproj" />
+  </ItemGroup>
+  
 </Project>

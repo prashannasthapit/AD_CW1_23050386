@@ -3,11 +3,15 @@
     <!-- Enable central package management, https://learn.microsoft.com/en-us/nuget/consume-packages/Central-Package-Management -->
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
-    <ItemGroup>
-        <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
-        <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)"/>
-        <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9"/>
-    </ItemGroup>
-
+  <ItemGroup Label="For MAUI.">
+    <PackageVersion Include="Markdig" Version="0.44.0" />
+    <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
+  </ItemGroup>
+  <ItemGroup Label="For EFCore.">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.9" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" PrivateAssets="all" />
+  </ItemGroup>
 </Project>
