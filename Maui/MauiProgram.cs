@@ -3,6 +3,7 @@ using Infrastructure.Data;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MudBlazor.Services;
 
 namespace Maui;
 
@@ -28,6 +29,7 @@ public static class MauiProgram
         builder.Services.AddScoped<IJournalService, JournalService>();
         
         builder.Services.AddMauiBlazorWebView();
+        builder.Services.AddMudServices();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
@@ -35,6 +37,8 @@ public static class MauiProgram
 #endif
 
         var app = builder.Build();
+
+        // app.MapStaticAssets();
 
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<JournalDbContext>();

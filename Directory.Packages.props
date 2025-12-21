@@ -8,6 +8,7 @@
     <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
+    <PackageVersion Include="MudBlazor" Version="8.15.0" />
   </ItemGroup>
   <ItemGroup Label="For EFCore.">
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.9" />

@@ -64,7 +64,6 @@
 <div class="form-group">
     <label>Content:</label>
     <textarea rows="16" style="width:100%;" @bind="_content"></textarea>
-    <div>Word count: @_wordCount</div>
 </div>
 
 <button @onclick="Save">Save</button>
@@ -85,7 +84,6 @@
     private string _newTag = string.Empty;
     private JournalEntry? _current;
     private string _statusMessage = string.Empty;
-    private int _wordCount => string.IsNullOrWhiteSpace(_content) ? 0 : _content.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
 
     private void OnSecondaryMoodsChanged(ChangeEventArgs e)
     {
