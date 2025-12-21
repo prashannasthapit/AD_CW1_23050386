@@ -1,0 +1,26 @@
+@using Domain.Entities
+
+<MudChip T="string" 
+         Color="@GetColor()" 
+         Size="@Size" 
+         Variant="Variant.Filled"
+         Class="mood-chip">
+    <span style="margin-right: 4px;">@Mood.GetEmoji()</span>
+    @Mood.ToString()
+</MudChip>
+
+@code {
+    [Parameter] public Mood Mood { get; set; }
+    [Parameter] public Size Size { get; set; } = Size.Small;
+
+    private Color GetColor()
+    {
+        return Mood.GetCategory() switch
+        {
+            MoodCategory.Positive => Color.Success,
+            MoodCategory.Neutral => Color.Info,
+            MoodCategory.Negative => Color.Error,
+            _ => Color.Default
+        };
+    }
+}

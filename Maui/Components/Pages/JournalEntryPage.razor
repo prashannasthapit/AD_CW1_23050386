@@ -1,0 +1,420 @@
+@page "/entry/{DateString?}"
+@using Application.Interfaces
+@using Domain.Entities
+@using Maui.Components.Shared
+@inject IJournalService JournalService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <div>
+                <MudText Typo="Typo.h4">
+                    @(_isEditing ? "Edit Entry" : "New Entry")
+                </MudText>
+                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                    @_entryDate.ToString("dddd, MMMM d, yyyy")
+                </MudText>
+            </div>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="GoBack">
+                    Back
+                </MudButton>
+                @if (_isEditing)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               OnClick="ConfirmDelete">
+                        Delete
+                    </MudButton>
+                }
+            </MudStack>
+        </MudStack>
+
+        <MudGrid>
+            <!-- Main Editor -->
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <!-- Title -->
+                    <MudTextField @bind-Value="_title"
+                                  Label="Title (Optional)"
+                                  Placeholder="Give your entry a title..."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Class="mb-4"
+                                  MaxLength="200" />
+
+                    <!-- Content -->
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Content</MudText>
+                    <MudTextField @bind-Value="_content"
+                                  Placeholder="What's on your mind today? Write freely..."
+                                  Variant="Variant.Outlined"
+                                  Lines="15"
+                                  Class="mb-2"
+                                  HelperText="@($"{_content?.Split(new[] {' ', '\n', '\r'}, StringSplitOptions.RemoveEmptyEntries).Length ?? 0} words")" />
+                    
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                        <MudCheckBox @bind-Value="_isMarkdown" 
+                                     Label="Markdown formatting" 
+                                     Color="Color.Primary"
+                                     Dense="true" />
+                        @if (_isMarkdown)
+                        {
+                            <MudButton Variant="Variant.Text" 
+                                       Size="Size.Small"
+                                       OnClick="@(() => _showPreview = !_showPreview)">
+                                @(_showPreview ? "Hide Preview" : "Show Preview")
+                            </MudButton>
+                        }
+                    </MudStack>
+
+                    @if (_showPreview && _isMarkdown)
+                    {
+                        <MudPaper Class="pa-3 mb-4" Elevation="0" Style="background-color: var(--mud-palette-background-gray);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Preview</MudText>
+                            <div class="markdown-preview">
+                                @((MarkupString)RenderMarkdown(_content))
+                            </div>
+                        </MudPaper>
+                    }
+
+                    <!-- Save Button -->
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   OnClick="SaveEntry"
+                                   Disabled="_isSaving">
+                            @if (_isSaving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            }
+                            @(_isSaving ? "Saving..." : "Save Entry")
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Sidebar -->
+            <MudItem xs="12" md="4">
+                <!-- Date Selector -->
+                <MudPaper Class="pa-4 mb-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                        Entry Date
+                    </MudText>
+                    <MudDatePicker Date="@_selectedDate"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   MaxDate="DateTime.Today"
+                                   DateChanged="OnDateChanged" />
+                    @if (_dateHasExistingEntry && !_isEditing)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                            An entry already exists for this date. It will be updated.
+                        </MudAlert>
+                    }
+                </MudPaper>
+
+                <!-- Primary Mood -->
+                <MudPaper Class="pa-4 mb-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.SentimentSatisfiedAlt" Size="Size.Small" Class="mr-1" />
+                        Primary Mood (Required)
+                    </MudText>
+                    <MudChipSet T="Mood" 
+                                SelectionMode="SelectionMode.SingleSelection"
+                                @bind-SelectedValue="_primaryMood"
+                                CheckMark="false">
+                        @foreach (var category in Enum.GetValues<MoodCategory>())
+                        {
+                            <div class="mb-2">
+                                <MudText Typo="Typo.caption" Color="@GetCategoryColor(category)" Class="mb-1">
+                                    @category
+                                </MudText>
+                                <div>
+                                    @foreach (var mood in MoodExtensions.GetMoodsByCategory(category))
+                                    {
+                                        <MudChip T="Mood"
+                                                 Value="@mood"
+                                                 Color="@GetCategoryColor(category)"
+                                                 Variant="@(_primaryMood == mood ? Variant.Filled : Variant.Outlined)"
+                                                 Size="Size.Small"
+                                                 Class="ma-1">
+                                            @mood.GetEmoji() @mood
+                                        </MudChip>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </MudChipSet>
+                </MudPaper>
+
+                <!-- Secondary Moods -->
+                <MudPaper Class="pa-4 mb-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.AddReaction" Size="Size.Small" Class="mr-1" />
+                        Secondary Moods (Optional, max 2)
+                    </MudText>
+                    <MudChipSet T="Mood" 
+                                SelectionMode="SelectionMode.MultiSelection"
+                                @bind-SelectedValues="_secondaryMoodsSet"
+                                CheckMark="true">
+                        @foreach (var mood in Enum.GetValues<Mood>().Where(m => m != _primaryMood))
+                        {
+                            <MudChip T="Mood"
+                                     Value="@mood"
+                                     Color="@GetCategoryColor(mood.GetCategory())"
+                                     Variant="@(_secondaryMoodsSet.Contains(mood) ? Variant.Filled : Variant.Outlined)"
+                                     Size="Size.Small"
+                                     Disabled="@(!_secondaryMoodsSet.Contains(mood) && _secondaryMoodsSet.Count >= 2)"
+                                     Class="ma-1">
+                                @mood.GetEmoji() @mood
+                            </MudChip>
+                        }
+                    </MudChipSet>
+                </MudPaper>
+
+                <!-- Category -->
+                <MudPaper Class="pa-4 mb-4" Elevation="2">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" Class="mr-1" />
+                        Category
+                    </MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center">
+                        <MudSelect T="Guid?"
+                                   @bind-Value="_categoryId"
+                                   Label="Select Category"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Clearable="true"
+                                   Style="flex: 1;">
+                            @foreach (var cat in _categories)
+                            {
+                                <MudSelectItem Value="@((Guid?)cat.Id)">@cat.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                       Color="Color.Primary"
+                                       OnClick="ShowAddCategoryDialog" />
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Tags -->
+                <MudPaper Class="pa-4" Elevation="2">
+                    <TagSelector @bind-SelectedTags="_selectedTags" ShowPrebuiltSuggestions="true" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string? DateString { get; set; }
+
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private bool _isEditing = false;
+    private bool _dateHasExistingEntry = false;
+    private bool _showPreview = false;
+
+    private DateTime _entryDate = DateTime.Today;
+    private DateTime? _selectedDate = DateTime.Today;
+    private JournalEntry? _existingEntry;
+
+    private string _title = string.Empty;
+    private string _content = string.Empty;
+    private bool _isMarkdown = true;
+    private Mood _primaryMood = Mood.Thoughtful;
+    private IReadOnlyCollection<Mood> _secondaryMoodsSet = new HashSet<Mood>();
+    private Guid? _categoryId;
+    private IList<Tag> _selectedTags = new List<Tag>();
+    private IList<Category> _categories = new List<Category>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+        
+        if (!string.IsNullOrEmpty(DateString) && DateTime.TryParse(DateString, out var date))
+        {
+            _entryDate = date.Date;
+            _selectedDate = date.Date;
+        }
+
+        await LoadEntry();
+        _isLoading = false;
+    }
+
+    private async Task LoadCategories()
+    {
+        _categories = await JournalService.GetAllCategoriesAsync();
+    }
+
+    private async Task LoadEntry()
+    {
+        _existingEntry = await JournalService.GetEntryByDateAsync(_entryDate);
+        
+        if (_existingEntry != null)
+        {
+            _isEditing = true;
+            _title = _existingEntry.Title;
+            _content = _existingEntry.Content;
+            _isMarkdown = _existingEntry.IsMarkdown;
+            _primaryMood = _existingEntry.PrimaryMood;
+            _categoryId = _existingEntry.CategoryId;
+            _selectedTags = _existingEntry.EntryTags.Select(et => et.Tag).ToList();
+            
+            // Parse secondary moods
+            if (!string.IsNullOrEmpty(_existingEntry.SecondaryMoods))
+            {
+                var moods = _existingEntry.SecondaryMoods
+                    .Split(',')
+                    .Select(s => Enum.TryParse<Mood>(s.Trim(), out var m) ? m : (Mood?)null)
+                    .Where(m => m.HasValue)
+                    .Select(m => m!.Value)
+                    .ToHashSet();
+                _secondaryMoodsSet = moods;
+            }
+        }
+        else
+        {
+            _isEditing = false;
+            ResetForm();
+        }
+    }
+
+    private void ResetForm()
+    {
+        _title = string.Empty;
+        _content = string.Empty;
+        _isMarkdown = true;
+        _primaryMood = Mood.Thoughtful;
+        _secondaryMoodsSet = new HashSet<Mood>();
+        _categoryId = null;
+        _selectedTags = new List<Tag>();
+    }
+
+    private async Task OnDateChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue && newDate.Value.Date != _entryDate)
+        {
+            _entryDate = newDate.Value.Date;
+            _isLoading = true;
+            await LoadEntry();
+            _dateHasExistingEntry = _existingEntry != null;
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveEntry()
+    {
+        _isSaving = true;
+
+        try
+        {
+            var entry = new JournalEntry
+            {
+                EntryDate = _entryDate,
+                Title = _title,
+                Content = _content,
+                IsMarkdown = _isMarkdown,
+                PrimaryMood = _primaryMood,
+                SecondaryMoods = _secondaryMoodsSet.Any() 
+                    ? string.Join(",", _secondaryMoodsSet.Select(m => m.ToString())) 
+                    : null,
+                CategoryId = _categoryId,
+                EntryTags = _selectedTags.Select(t => new EntryTag 
+                { 
+                    TagId = t.Id, 
+                    Tag = t 
+                }).ToList()
+            };
+
+            if (_existingEntry != null)
+            {
+                entry.Id = _existingEntry.Id;
+            }
+
+            await JournalService.AddOrUpdateEntryAsync(entry);
+            
+            Snackbar.Add(_isEditing ? "Entry updated successfully!" : "Entry created successfully!", Severity.Success);
+            Navigation.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving entry: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Delete Entry",
+            "Are you sure you want to delete this entry? This action cannot be undone.",
+            "Delete",
+            "Cancel");
+
+        if (result == true && _existingEntry != null)
+        {
+            await JournalService.DeleteEntryAsync(_existingEntry.Id);
+            Snackbar.Add("Entry deleted successfully.", Severity.Info);
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task ShowAddCategoryDialog()
+    {
+        var parameters = new DialogParameters<AddCategoryDialog>();
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+        
+        var dialog = await DialogService.ShowAsync<AddCategoryDialog>("Add Category", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string categoryName })
+        {
+            var newCategory = await JournalService.AddCategoryAsync(categoryName);
+            await LoadCategories();
+            _categoryId = newCategory.Id;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private Color GetCategoryColor(MoodCategory category)
+    {
+        return category switch
+        {
+            MoodCategory.Positive => Color.Success,
+            MoodCategory.Neutral => Color.Info,
+            MoodCategory.Negative => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string RenderMarkdown(string? markdown)
+    {
+        if (string.IsNullOrEmpty(markdown))
+            return string.Empty;
+        
+        return Markdig.Markdown.ToHtml(markdown);
+    }
+}

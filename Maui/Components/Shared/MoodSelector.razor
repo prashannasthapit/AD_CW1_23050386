@@ -1,0 +1,85 @@
+@using Domain.Entities
+
+<div class="mood-selector">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">@Label</MudText>
+    
+    @foreach (var category in Enum.GetValues<MoodCategory>())
+    {
+        <div class="mood-category mb-3">
+            <MudText Typo="Typo.caption" Color="@GetCategoryColor(category)" Class="mb-1">
+                @category.ToString()
+            </MudText>
+            <MudChipSet T="Mood" 
+                        SelectionMode="@(AllowMultiple ? SelectionMode.MultiSelection : SelectionMode.SingleSelection)"
+                        SelectedValues="@GetSelectedForCategory(category)"
+                        SelectedValuesChanged="@(values => OnSelectionChanged(category, values))"
+                        CheckMark="@AllowMultiple"
+                        Variant="Variant.Filled">
+                @foreach (var mood in MoodExtensions.GetMoodsByCategory(category))
+                {
+                    <MudChip T="Mood" 
+                             Value="@mood"
+                             Color="@GetCategoryColor(category)"
+                             Variant="@(IsSelected(mood) ? Variant.Filled : Variant.Outlined)"
+                             Size="Size.Small">
+                        @mood.GetEmoji() @mood.ToString()
+                    </MudChip>
+                }
+            </MudChipSet>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Select Mood";
+    [Parameter] public bool AllowMultiple { get; set; } = false;
+    [Parameter] public int MaxSelections { get; set; } = 1;
+    [Parameter] public IEnumerable<Mood> SelectedMoods { get; set; } = new List<Mood>();
+    [Parameter] public EventCallback<IEnumerable<Mood>> SelectedMoodsChanged { get; set; }
+    [Parameter] public Mood? ExcludeMood { get; set; }
+
+    private HashSet<Mood> _selectedMoods = new();
+
+    protected override void OnParametersSet()
+    {
+        _selectedMoods = SelectedMoods?.ToHashSet() ?? new HashSet<Mood>();
+    }
+
+    private bool IsSelected(Mood mood) => _selectedMoods.Contains(mood);
+
+    private IReadOnlyCollection<Mood> GetSelectedForCategory(MoodCategory category)
+    {
+        return _selectedMoods.Where(m => m.GetCategory() == category).ToList();
+    }
+
+    private async Task OnSelectionChanged(MoodCategory category, IReadOnlyCollection<Mood> values)
+    {
+        // Remove old selections from this category
+        _selectedMoods.RemoveWhere(m => m.GetCategory() == category);
+        
+        // Add new selections
+        foreach (var mood in values)
+        {
+            if (ExcludeMood.HasValue && mood == ExcludeMood.Value)
+                continue;
+                
+            if (_selectedMoods.Count < MaxSelections || AllowMultiple)
+            {
+                _selectedMoods.Add(mood);
+            }
+        }
+
+        await SelectedMoodsChanged.InvokeAsync(_selectedMoods.ToList());
+    }
+
+    private Color GetCategoryColor(MoodCategory category)
+    {
+        return category switch
+        {
+            MoodCategory.Positive => Color.Success,
+            MoodCategory.Neutral => Color.Info,
+            MoodCategory.Negative => Color.Error,
+            _ => Color.Default
+        };
+    }
+}

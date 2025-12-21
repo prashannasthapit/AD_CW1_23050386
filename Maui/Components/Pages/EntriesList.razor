@@ -1,0 +1,388 @@
+@page "/entries"
+@using Application.Interfaces
+@using Domain.Entities
+@inject IJournalService JournalService
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.List" Class="mr-2" />
+        Journal Entries
+    </MudText>
+
+    <!-- Filters -->
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_searchQuery"
+                              Label="Search"
+                              Placeholder="Search by title or content..."
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true"
+                              DebounceInterval="500"
+                              OnDebounceIntervalElapsed="OnSearchChanged" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudDatePicker Date="@_dateFrom"
+                               Label="From Date"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true"
+                               DateChanged="@(async d => { _dateFrom = d; await LoadEntries(); })" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudDatePicker Date="@_dateTo"
+                               Label="To Date"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true"
+                               DateChanged="@(async d => { _dateTo = d; await LoadEntries(); })" />
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudSelect T="Mood?"
+                           Value="@_selectedMood"
+                           Label="Mood Filter"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Clearable="true"
+                           ValueChanged="@(async m => { _selectedMood = m; await LoadEntries(); })">
+                    @foreach (var mood in Enum.GetValues<Mood>())
+                    {
+                        <MudSelectItem Value="@((Mood?)mood)">
+                            @mood.GetEmoji() @mood
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudSelect T="Guid?"
+                           Value="@_selectedCategoryId"
+                           Label="Category"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Clearable="true"
+                           ValueChanged="@(async c => { _selectedCategoryId = c; await LoadEntries(); })">
+                    @foreach (var cat in _categories)
+                    {
+                        <MudSelectItem Value="@((Guid?)cat.Id)">@cat.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+        
+        @if (_selectedTagIds.Any())
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-3">
+                <MudText Typo="Typo.body2">Active tag filters:</MudText>
+                @foreach (var tagId in _selectedTagIds)
+                {
+                    var tag = _allTags.FirstOrDefault(t => t.Id == tagId);
+                    if (tag != null)
+                    {
+                        <MudChip T="Guid" 
+                                 Color="Color.Primary" 
+                                 Size="Size.Small"
+                                 OnClose="@(() => RemoveTagFilter(tagId))">
+                            @tag.Name
+                        </MudChip>
+                    }
+                }
+            </MudStack>
+        }
+        
+        <MudExpansionPanels Dense="true" Class="mt-2">
+            <MudExpansionPanel Text="Filter by Tags" Dense="true">
+                <MudChipSet T="Guid" 
+                            SelectionMode="SelectionMode.MultiSelection"
+                            SelectedValues="@_selectedTagIdsSet"
+                            SelectedValuesChanged="OnTagFilterChanged">
+                    @foreach (var tag in _allTags)
+                    {
+                        <MudChip T="Guid"
+                                 Value="@tag.Id"
+                                 Color="@(tag.IsPrebuilt ? Color.Primary : Color.Secondary)"
+                                 Variant="@(_selectedTagIds.Contains(tag.Id) ? Variant.Filled : Variant.Outlined)"
+                                 Size="Size.Small">
+                            @tag.Name
+                        </MudChip>
+                    }
+                </MudChipSet>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudPaper>
+
+    <!-- Results -->
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+    else if (!_entries.Any())
+    {
+        <MudPaper Class="pa-8 text-center" Elevation="2">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-3">No entries found</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                @(string.IsNullOrEmpty(_searchQuery) && !_dateFrom.HasValue && !_dateTo.HasValue 
+                    ? "Start journaling to see your entries here!" 
+                    : "Try adjusting your filters or search query.")
+            </MudText>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Navigation.NavigateTo($"/entry/{DateTime.Today:yyyy-MM-dd}"))">
+                Create New Entry
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Showing @_entries.Count of @_totalCount entries
+            </MudText>
+            <MudToggleGroup T="string" @bind-Value="_viewMode" Color="Color.Primary" Size="Size.Small">
+                <MudToggleItem Value="@("list")" UnselectedIcon="@Icons.Material.Filled.ViewList" SelectedIcon="@Icons.Material.Filled.ViewList" />
+                <MudToggleItem Value="@("cards")" UnselectedIcon="@Icons.Material.Filled.GridView" SelectedIcon="@Icons.Material.Filled.GridView" />
+            </MudToggleGroup>
+        </MudStack>
+
+        @if (_viewMode == "cards")
+        {
+            <MudGrid>
+                @foreach (var entry in _entries)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard Elevation="2" Class="cursor-pointer entry-card" 
+                                 Style="height: 100%;"
+                                 @onclick="@(() => Navigation.NavigateTo($"/entry/{entry.EntryDate:yyyy-MM-dd}"))">
+                            <MudCardHeader>
+                                <CardHeaderAvatar>
+                                    <MudAvatar Style="@($"background-color: {entry.PrimaryMood.GetCategory().GetCategoryColor()}")">
+                                        @entry.PrimaryMood.GetEmoji()
+                                    </MudAvatar>
+                                </CardHeaderAvatar>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.body1" Class="text-truncate" Style="max-width: 200px;">
+                                        @(string.IsNullOrEmpty(entry.Title) ? entry.EntryDate.ToString("MMMM d, yyyy") : entry.Title)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @entry.EntryDate.ToString("ddd, MMM d, yyyy")
+                                    </MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudText Typo="Typo.body2" Class="text-truncate-3" Style="height: 60px; overflow: hidden;">
+                                    @GetContentPreview(entry.Content)
+                                </MudText>
+                                @if (entry.EntryTags.Any())
+                                {
+                                    <MudStack Row="true" Class="mt-2" Style="flex-wrap: wrap; gap: 4px;">
+                                        @foreach (var tag in entry.EntryTags.Take(3))
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                                @tag.Tag.Name
+                                            </MudChip>
+                                        }
+                                        @if (entry.EntryTags.Count > 3)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                                                +@(entry.EntryTags.Count - 3)
+                                            </MudChip>
+                                        }
+                                    </MudStack>
+                                }
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @entry.WordCount words
+                                    @if (entry.Category != null)
+                                    {
+                                        <text> • @entry.Category.Name</text>
+                                    }
+                                </MudText>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        else
+        {
+            <MudPaper Elevation="2">
+                <MudList T="JournalEntry" Dense="false" Class="py-0">
+                    @foreach (var entry in _entries)
+                    {
+                        <MudListItem OnClick="@(() => Navigation.NavigateTo($"/entry/{entry.EntryDate:yyyy-MM-dd}"))">
+                            <div class="d-flex align-center" style="width: 100%; gap: 16px;">
+                                <MudAvatar Size="Size.Medium" 
+                                           Style="@($"background-color: {entry.PrimaryMood.GetCategory().GetCategoryColor()}")">
+                                    @entry.PrimaryMood.GetEmoji()
+                                </MudAvatar>
+                                <div style="flex: 1; min-width: 0;">
+                                    <MudText Typo="Typo.body1" Class="text-truncate">
+                                        @(string.IsNullOrEmpty(entry.Title) ? entry.EntryDate.ToString("MMMM d, yyyy") : entry.Title)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @entry.EntryDate.ToString("dddd, MMM d, yyyy") • @entry.WordCount words
+                                        @if (entry.Category != null)
+                                        {
+                                            <text> • @entry.Category.Name</text>
+                                        }
+                                    </MudText>
+                                    @if (entry.EntryTags.Any())
+                                    {
+                                        <MudStack Row="true" Class="mt-1" Style="flex-wrap: wrap; gap: 4px;">
+                                            @foreach (var tag in entry.EntryTags.Take(5))
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                                    @tag.Tag.Name
+                                                </MudChip>
+                                            }
+                                            @if (entry.EntryTags.Count > 5)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                                                    +@(entry.EntryTags.Count - 5)
+                                                </MudChip>
+                                            }
+                                        </MudStack>
+                                    }
+                                </div>
+                                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Secondary" />
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            </MudPaper>
+        }
+
+        <!-- Pagination -->
+        @if (_totalCount > _pageSize)
+        {
+            <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+                <MudPagination Count="@((_totalCount + _pageSize - 1) / _pageSize)"
+                               Selected="@_currentPage"
+                               Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               ShowFirstButton="true"
+                               ShowLastButton="true"
+                               SelectedChanged="OnPageChanged" />
+            </MudStack>
+        }
+    }
+</MudContainer>
+
+<style>
+    .entry-card:hover {
+        transform: translateY(-2px);
+        transition: transform 0.2s ease;
+    }
+    .text-truncate-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+</style>
+
+@code {
+    private bool _isLoading = true;
+    private IList<JournalEntry> _entries = new List<JournalEntry>();
+    private IList<Category> _categories = new List<Category>();
+    private IList<Tag> _allTags = new List<Tag>();
+    private int _totalCount;
+
+    // Filters
+    private string? _searchQuery;
+    private DateTime? _dateFrom;
+    private DateTime? _dateTo;
+    private Mood? _selectedMood;
+    private Guid? _selectedCategoryId;
+    private List<Guid> _selectedTagIds = new();
+    private IReadOnlyCollection<Guid> _selectedTagIdsSet = new HashSet<Guid>();
+
+    // View & Pagination
+    private string _viewMode = "list";
+    private int _currentPage = 1;
+    private int _pageSize = 12;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadCategories(), LoadTags());
+        await LoadEntries();
+        _isLoading = false;
+    }
+
+    private async Task LoadCategories()
+    {
+        _categories = await JournalService.GetAllCategoriesAsync();
+    }
+
+    private async Task LoadTags()
+    {
+        _allTags = await JournalService.GetAllTagsAsync();
+    }
+
+    private async Task LoadEntries()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        var moods = _selectedMood.HasValue ? new[] { _selectedMood.Value } : null;
+        
+        var result = await JournalService.SearchAsync(
+            _searchQuery,
+            _dateFrom,
+            _dateTo,
+            moods,
+            _selectedTagIds.Any() ? _selectedTagIds : null,
+            _selectedCategoryId,
+            _currentPage,
+            _pageSize);
+
+        _entries = result.Entries;
+        _totalCount = result.TotalCount;
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task OnSearchChanged(string? value)
+    {
+        _currentPage = 1;
+        await LoadEntries();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page;
+        await LoadEntries();
+    }
+
+    private async Task OnTagFilterChanged(IReadOnlyCollection<Guid> values)
+    {
+        _selectedTagIds = values.ToList();
+        _currentPage = 1;
+        await LoadEntries();
+    }
+
+    private async Task RemoveTagFilter(Guid tagId)
+    {
+        _selectedTagIds.Remove(tagId);
+        _selectedTagIdsSet = _selectedTagIds.ToHashSet();
+        _currentPage = 1;
+        await LoadEntries();
+    }
+
+    private string GetContentPreview(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return "No content";
+        
+        // Strip markdown formatting for preview
+        var clean = System.Text.RegularExpressions.Regex.Replace(content, @"[#*_`\[\]()]", "");
+        return clean.Length > 150 ? clean[..150] + "..." : clean;
+    }
+}

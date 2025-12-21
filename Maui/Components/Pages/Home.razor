@@ -1,5 +1,301 @@
 ﻿@page "/"
+@using Application.Interfaces
+@using Domain.Entities
+@inject IJournalService JournalService
+@inject NavigationManager Navigation
 
-<h1>Hello, world!</h1>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
+        Journal Dashboard
+    </MudText>
 
-Welcome to your new app.
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    }
+    else
+    {
+        <!-- Quick Actions -->
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudText Typo="Typo.h6">@DateTime.Today.ToString("dddd, MMMM d, yyyy")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @(_hasTodayEntry ? "You've already journaled today! ✨" : "Ready to write today's entry?")
+                    </MudText>
+                </div>
+                <MudButton Variant="Variant.Filled" 
+                           Color="@(_hasTodayEntry ? Color.Secondary : Color.Primary)"
+                           StartIcon="@(_hasTodayEntry ? Icons.Material.Filled.Edit : Icons.Material.Filled.Add)"
+                           Size="Size.Large"
+                           OnClick="@(() => Navigation.NavigateTo($"/entry/{DateTime.Today:yyyy-MM-dd}"))">
+                    @(_hasTodayEntry ? "Edit Today's Entry" : "Write Today's Entry")
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        <!-- Streak & Stats Cards -->
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Size="Size.Large" />
+                    <MudText Typo="Typo.h3" Class="mt-2">@_currentStreak</MudText>
+                    <MudText Typo="Typo.body2">Current Streak</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                    <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Large" />
+                    <MudText Typo="Typo.h3" Class="mt-2">@_longestStreak</MudText>
+                    <MudText Typo="Typo.body2">Longest Streak</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                    <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" />
+                    <MudText Typo="Typo.h3" Class="mt-2">@_totalEntries</MudText>
+                    <MudText Typo="Typo.body2">Total Entries</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-4 text-center" Elevation="2" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+                    <MudIcon Icon="@Icons.Material.Filled.SentimentSatisfied" Size="Size.Large" />
+                    @if (_mostFrequentMood.HasValue)
+                    {
+                        <MudText Typo="Typo.h3" Class="mt-2">@_mostFrequentMood.Value.GetEmoji()</MudText>
+                        <MudText Typo="Typo.body2">Top Mood: @_mostFrequentMood.Value</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h3" Class="mt-2">—</MudText>
+                        <MudText Typo="Typo.body2">No Data Yet</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Analytics Section -->
+        <MudGrid>
+            <!-- Mood Distribution -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.PieChart" Class="mr-2" />
+                        Mood Distribution (Last 30 Days)
+                    </MudText>
+                    @if (_moodCategoryDistribution.Any())
+                    {
+                        <MudChart ChartType="ChartType.Donut" 
+                                  InputData="@_moodCategoryData" 
+                                  InputLabels="@_moodCategoryLabels"
+                                  Width="300px" 
+                                  Height="300px"
+                                  ChartOptions="_chartOptions" />
+                        <MudStack Row="true" Justify="Justify.Center" Class="mt-3">
+                            @foreach (var cat in _moodCategoryDistribution)
+                            {
+                                var percent = _totalMoodCount > 0 ? (cat.Value * 100.0 / _totalMoodCount) : 0;
+                                <MudChip T="string" 
+                                         Color="@GetCategoryColor(cat.Key)" 
+                                         Size="Size.Small"
+                                         Variant="Variant.Filled">
+                                    @cat.Key: @percent.ToString("F0")%
+                                </MudChip>
+                            }
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary" Class="text-center pa-4">No mood data available yet.</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Top Tags -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Tag" Class="mr-2" />
+                        Most Used Tags (Last 30 Days)
+                    </MudText>
+                    @if (_tagUsage.Any())
+                    {
+                        <MudChart ChartType="ChartType.Bar" 
+                                  InputData="@_tagData" 
+                                  InputLabels="@_tagLabels"
+                                  Width="100%" 
+                                  Height="250px"
+                                  ChartOptions="_barChartOptions" />
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary" Class="text-center pa-4">No tag data available yet.</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Calendar Mini View -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="mr-2" />
+                            This Month
+                        </MudText>
+                        <MudButton Variant="Variant.Text" 
+                                   Color="Color.Primary"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   OnClick="@(() => Navigation.NavigateTo("/calendar"))">
+                            Full Calendar
+                        </MudButton>
+                    </MudStack>
+                    <MudDatePicker Date="@_selectedCalendarDate"
+                                   PickerVariant="PickerVariant.Static"
+                                   Color="Color.Primary"
+                                   DateChanged="OnCalendarDateChanged" />
+                </MudPaper>
+            </MudItem>
+
+            <!-- Recent Entries -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+                            Recent Entries
+                        </MudText>
+                        <MudButton Variant="Variant.Text" 
+                                   Color="Color.Primary"
+                                   EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   OnClick="@(() => Navigation.NavigateTo("/entries"))">
+                            View All
+                        </MudButton>
+                    </MudStack>
+                    @if (_recentEntries.Any())
+                    {
+                        <MudList T="JournalEntry" Dense="true" Class="py-0">
+                            @foreach (var entry in _recentEntries)
+                            {
+                                <MudListItem OnClick="@(() => Navigation.NavigateTo($"/entry/{entry.EntryDate:yyyy-MM-dd}"))">
+                                    <div class="d-flex align-center" style="width: 100%;">
+                                        <MudAvatar Size="Size.Small" Class="mr-3" 
+                                                   Style="@($"background-color: {entry.PrimaryMood.GetCategory().GetCategoryColor()}")">
+                                            @entry.PrimaryMood.GetEmoji()
+                                        </MudAvatar>
+                                        <div style="flex: 1; min-width: 0;">
+                                            <MudText Typo="Typo.body1" Class="text-truncate">
+                                                @(string.IsNullOrEmpty(entry.Title) ? entry.EntryDate.ToString("MMM d") : entry.Title)
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @entry.EntryDate.ToString("ddd, MMM d") • @entry.WordCount words
+                                            </MudText>
+                                        </div>
+                                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Secondary" />
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary" Class="text-center pa-4">No entries yet. Start journaling today!</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private bool _isLoading = true;
+    private bool _hasTodayEntry;
+    private int _currentStreak;
+    private int _longestStreak;
+    private int _totalEntries;
+    private Mood? _mostFrequentMood;
+    private Dictionary<MoodCategory, int> _moodCategoryDistribution = new();
+    private Dictionary<string, int> _tagUsage = new();
+    private IList<JournalEntry> _recentEntries = new List<JournalEntry>();
+    private IList<DateTime> _datesWithEntries = new List<DateTime>();
+    private DateTime? _selectedCalendarDate = DateTime.Today;
+
+    private double[] _moodCategoryData = Array.Empty<double>();
+    private string[] _moodCategoryLabels = Array.Empty<string>();
+    private double[] _tagData = Array.Empty<double>();
+    private string[] _tagLabels = Array.Empty<string>();
+    private int _totalMoodCount;
+
+    private ChartOptions _chartOptions = new()
+    {
+        ChartPalette = new[] { "#4caf50", "#2196f3", "#f44336" }
+    };
+
+    private ChartOptions _barChartOptions = new()
+    {
+        ChartPalette = new[] { "#7c4dff" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+        _isLoading = false;
+    }
+
+    private async Task LoadDashboardData()
+    {
+        var today = DateTime.Today;
+        var thirtyDaysAgo = today.AddDays(-30);
+
+        // Run all queries in parallel for better performance
+        var todayEntryTask = JournalService.HasEntryForDateAsync(today);
+        var currentStreakTask = JournalService.GetCurrentStreakAsync(today);
+        var longestStreakTask = JournalService.GetLongestStreakAsync();
+        var totalEntriesTask = JournalService.GetTotalEntriesCountAsync();
+        var mostFrequentMoodTask = JournalService.GetMostFrequentMoodAsync(thirtyDaysAgo, today);
+        var moodDistributionTask = JournalService.GetMoodCategoryDistributionAsync(thirtyDaysAgo, today);
+        var tagUsageTask = JournalService.GetTagUsageAsync(thirtyDaysAgo, today, 8);
+        var recentEntriesTask = JournalService.SearchAsync(null, null, null, null, null, null, 1, 5);
+        var datesWithEntriesTask = JournalService.GetDatesWithEntriesAsync(today);
+
+        await Task.WhenAll(todayEntryTask, currentStreakTask, longestStreakTask, totalEntriesTask, 
+            mostFrequentMoodTask, moodDistributionTask, tagUsageTask, recentEntriesTask, datesWithEntriesTask);
+
+        _hasTodayEntry = todayEntryTask.Result;
+        _currentStreak = currentStreakTask.Result;
+        _longestStreak = longestStreakTask.Result;
+        _totalEntries = totalEntriesTask.Result;
+        _mostFrequentMood = mostFrequentMoodTask.Result;
+        _moodCategoryDistribution = moodDistributionTask.Result;
+        _tagUsage = tagUsageTask.Result;
+        _recentEntries = recentEntriesTask.Result.Entries;
+        _datesWithEntries = datesWithEntriesTask.Result;
+
+        // Prepare chart data
+        _totalMoodCount = _moodCategoryDistribution.Values.Sum();
+        _moodCategoryData = _moodCategoryDistribution.Values.Select(v => (double)v).ToArray();
+        _moodCategoryLabels = _moodCategoryDistribution.Keys.Select(k => k.ToString()).ToArray();
+        
+        _tagData = _tagUsage.Values.Select(v => (double)v).ToArray();
+        _tagLabels = _tagUsage.Keys.ToArray();
+    }
+
+    private Color GetCategoryColor(MoodCategory category)
+    {
+        return category switch
+        {
+            MoodCategory.Positive => Color.Success,
+            MoodCategory.Neutral => Color.Info,
+            MoodCategory.Negative => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private void OnCalendarDateChanged(DateTime? date)
+    {
+        if (date.HasValue)
+        {
+            Navigation.NavigateTo($"/entry/{date.Value:yyyy-MM-dd}");
+        }
+    }
+}

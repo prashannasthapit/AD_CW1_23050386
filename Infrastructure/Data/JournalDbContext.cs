@@ -9,6 +9,7 @@ public class JournalDbContext(DbContextOptions opts) : DbContext(opts)
     public DbSet<Tag> Tags { get; set; } = null!;
     public DbSet<EntryTag> EntryTags { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
+    public DbSet<User> Users { get; set; } = null!;
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -32,5 +33,10 @@ public class JournalDbContext(DbContextOptions opts) : DbContext(opts)
         modelBuilder.Entity<JournalEntry>()
             .HasIndex(j => j.EntryDate)
             .IsUnique(false); // We'll enforce uniqueness at app level by comparing Date parts.
+            
+        // Configure Tag entity
+        modelBuilder.Entity<Tag>()
+            .HasIndex(t => t.Name)
+            .IsUnique();
     }
 }

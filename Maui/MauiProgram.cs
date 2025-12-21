@@ -29,7 +29,14 @@ public static class MauiProgram
         builder.Services.AddScoped<IJournalService, JournalService>();
         
         builder.Services.AddMauiBlazorWebView();
-        builder.Services.AddMudServices();
+        builder.Services.AddMudServices(config =>
+        {
+            config.SnackbarConfiguration.PositionClass = MudBlazor.Defaults.Classes.Position.BottomRight;
+            config.SnackbarConfiguration.PreventDuplicates = false;
+            config.SnackbarConfiguration.NewestOnTop = true;
+            config.SnackbarConfiguration.ShowCloseIcon = true;
+            config.SnackbarConfiguration.VisibleStateDuration = 3000;
+        });
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
@@ -38,11 +45,13 @@ public static class MauiProgram
 
         var app = builder.Build();
 
-        // app.MapStaticAssets();
-
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<JournalDbContext>();
         db.Database.Migrate();
+        
+        // Ensure prebuilt tags exist
+        var journalService = scope.ServiceProvider.GetRequiredService<IJournalService>();
+        journalService.EnsurePrebuiltTagsAsync().GetAwaiter().GetResult();
 
         return app;
     }
