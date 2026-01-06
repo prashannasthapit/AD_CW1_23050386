@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Maui</title>
+    <title>Journal App</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
@@ -24,6 +24,16 @@
     </div>
 
     <script src="_framework/blazor.webview.js" autostart="false"></script>
+    
+    <script>
+        window.setTheme = (theme) => {
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        };
+        
+        window.getTheme = () => {
+            return document.documentElement.getAttribute('data-bs-theme') || 'light';
+        };
+    </script>
 
 </body>
 

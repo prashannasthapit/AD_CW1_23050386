@@ -1,5 +1,44 @@
 ﻿@page "/"
+@inject IUserService UserService
+@inject NavigationManager Navigation
 
-<h1>Hello, world!</h1>
+<h1>Journal App</h1>
 
-Welcome to your new app.
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else if (_currentUser == null)
+{
+    <p>Please <a href="/login">login</a> or <a href="/register">register</a> to continue.</p>
+}
+else
+{
+    <p>Welcome, <strong>@_currentUser.Username</strong>!</p>
+    <p>Theme: @_currentUser.Theme</p>
+    <p>Account created: @_currentUser.CreatedAt</p>
+    
+    <button @onclick="HandleLogout">Logout</button>
+}
+
+@code {
+    private UserDisplayModel? _currentUser;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await UserService.GetCurrentUserAsync();
+        if (result.Success)
+        {
+            _currentUser = result.Data;
+        }
+        _isLoading = false;
+    }
+
+    private void HandleLogout()
+    {
+        UserService.SetCurrentUser(null);
+        _currentUser = null;
+        Navigation.NavigateTo("/login");
+    }
+}

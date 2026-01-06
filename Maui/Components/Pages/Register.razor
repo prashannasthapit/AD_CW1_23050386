@@ -1,0 +1,95 @@
+@page "/register"
+@inject IUserService UserService
+@inject NavigationManager Navigation
+
+<h3>Register</h3>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div style="color: red; margin-bottom: 10px;">@_errorMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(_successMessage))
+{
+    <div style="color: green; margin-bottom: 10px;">@_successMessage</div>
+}
+
+<div style="max-width: 300px;">
+    <div style="margin-bottom: 10px;">
+        <label>Username:</label>
+        <input type="text" @bind="_username" style="width: 100%;" />
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <label>PIN (min 4 characters):</label>
+        <input type="password" @bind="_pin" style="width: 100%;" />
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <label>Confirm PIN:</label>
+        <input type="password" @bind="_confirmPin" style="width: 100%;" />
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <button @onclick="HandleRegister" disabled="@_isLoading">
+            @(_isLoading ? "Registering..." : "Register")
+        </button>
+    </div>
+    
+    <div>
+        <span>Already have an account? </span>
+        <a href="/login">Login</a>
+    </div>
+</div>
+
+@code {
+    private string _username = "";
+    private string _pin = "";
+    private string _confirmPin = "";
+    private string _errorMessage = "";
+    private string _successMessage = "";
+    private bool _isLoading = false;
+
+    private async Task HandleRegister()
+    {
+        _errorMessage = "";
+        _successMessage = "";
+        _isLoading = true;
+
+        try
+        {
+            if (_pin != _confirmPin)
+            {
+                _errorMessage = "PINs do not match.";
+                return;
+            }
+
+            var model = new UserLoginModel
+            {
+                Username = _username,
+                Pin = _pin
+            };
+
+            var result = await UserService.RegisterAsync(model);
+
+            if (result.Success)
+            {
+                _successMessage = "Registration successful!";
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Registration failed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
+

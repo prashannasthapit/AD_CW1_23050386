@@ -1,0 +1,75 @@
+@page "/login"
+@inject IUserService UserService
+@inject NavigationManager Navigation
+
+<h3>Login</h3>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div style="color: red; margin-bottom: 10px;">@_errorMessage</div>
+}
+
+<div style="max-width: 300px;">
+    <div style="margin-bottom: 10px;">
+        <label>Username:</label>
+        <input type="text" @bind="_username" style="width: 100%;" />
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <label>PIN:</label>
+        <input type="password" @bind="_pin" style="width: 100%;" />
+    </div>
+    
+    <div style="margin-bottom: 10px;">
+        <button @onclick="HandleLogin" disabled="@_isLoading">
+            @(_isLoading ? "Logging in..." : "Login")
+        </button>
+    </div>
+    
+    <div>
+        <span>Don't have an account? </span>
+        <a href="/register">Register</a>
+    </div>
+</div>
+
+@code {
+    private string _username = "";
+    private string _pin = "";
+    private string _errorMessage = "";
+    private bool _isLoading = false;
+
+    private async Task HandleLogin()
+    {
+        _errorMessage = "";
+        _isLoading = true;
+
+        try
+        {
+            var model = new UserLoginModel
+            {
+                Username = _username,
+                Pin = _pin
+            };
+
+            var result = await UserService.LoginAsync(model);
+
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Login failed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
+

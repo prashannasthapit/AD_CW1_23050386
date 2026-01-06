@@ -1,8 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <Folder Include="Data\SqliteDb\" />
-    <Folder Include="Data\Migrations\" />
-  </ItemGroup>
 
   <ItemGroup Label="For Persistence.">
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />

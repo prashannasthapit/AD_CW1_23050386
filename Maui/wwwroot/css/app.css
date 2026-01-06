@@ -38,6 +38,62 @@ h1:focus {
     color: #e50000;
 }
 
+/* Dark theme global overrides - only affects content area and top-row (not sidebar) */
+html[data-bs-theme="dark"] .content {
+    background-color: #212529;
+    color: #dee2e6;
+}
+
+html[data-bs-theme="dark"] main {
+    background-color: #212529;
+}
+
+html[data-bs-theme="dark"] .header-row {
+    background-color: #212529;
+    border-bottom-color: #495057;
+}
+
+html[data-bs-theme="dark"] .content a, 
+html[data-bs-theme="dark"] .content .btn-link {
+    color: #6ea8fe;
+}
+
+html[data-bs-theme="dark"] .content input,
+html[data-bs-theme="dark"] .content textarea,
+html[data-bs-theme="dark"] .content select {
+    background-color: #2b3035;
+    color: #dee2e6;
+    border-color: #495057;
+}
+
+html[data-bs-theme="dark"] .content input::placeholder,
+html[data-bs-theme="dark"] .content textarea::placeholder {
+    color: #6c757d;
+}
+
+html[data-bs-theme="dark"] .content button,
+html[data-bs-theme="dark"] .content .btn {
+    background-color: #495057;
+    color: #dee2e6;
+    border-color: #6c757d;
+}
+
+html[data-bs-theme="dark"] .content .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+html[data-bs-theme="dark"] .content .btn-outline-secondary {
+    color: #dee2e6;
+    border-color: #6c757d;
+}
+
+html[data-bs-theme="dark"] .content .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: #fff;
+}
+
 #blazor-error-ui {
     background: lightyellow;
     bottom: 0;

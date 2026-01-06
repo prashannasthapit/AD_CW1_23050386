@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JS
+@inject IUserService UserService
 
 <div class="page">
     <div class="sidebar">
@@ -6,7 +8,17 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
+        <div class="header-row px-4 d-flex justify-content-end align-items-center">
+            <button class="btn btn-sm btn-outline-secondary me-3" @onclick="ToggleTheme">
+                @if (_currentTheme == "dark")
+                {
+                    <span>☀️ Light</span>
+                }
+                else
+                {
+                    <span>🌙 Dark</span>
+                }
+            </button>
             <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
 
@@ -15,3 +27,41 @@
         </article>
     </main>
 </div>
+
+@code {
+    private string _currentTheme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check if user is logged in and has a theme preference
+            var userResult = await UserService.GetCurrentUserAsync();
+            if (userResult.Success && userResult.Data != null)
+            {
+                _currentTheme = userResult.Data.Theme.ToLower();
+            }
+            else
+            {
+                _currentTheme = await JS.InvokeAsync<string>("getTheme");
+            }
+            
+            await JS.InvokeVoidAsync("setTheme", _currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        _currentTheme = _currentTheme == "light" ? "dark" : "light";
+        await JS.InvokeVoidAsync("setTheme", _currentTheme);
+        
+        // Update user theme preference if logged in
+        var userResult = await UserService.GetCurrentUserAsync();
+        if (userResult.Success && userResult.Data != null)
+        {
+            var theme = _currentTheme == "dark" ? "Dark" : "Light";
+            await UserService.UpdateThemeAsync(userResult.Data.Id, theme);
+        }
+    }
+}

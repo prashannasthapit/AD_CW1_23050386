@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Data;
 
-public class JournalDbContext(DbContextOptions opts) : DbContext(opts)
+public class JournalDbContext : DbContext
 {
     public DbSet<JournalEntry> JournalEntries { get; set; } = null!;
     public DbSet<Tag> Tags { get; set; } = null!;
@@ -38,5 +38,19 @@ public class JournalDbContext(DbContextOptions opts) : DbContext(opts)
         modelBuilder.Entity<Tag>()
             .HasIndex(t => t.Name)
             .IsUnique();
+    }
+    
+    private readonly string _dbPath;
+
+    public JournalDbContext()
+    {
+        var folder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        _dbPath = Path.Combine(folder, "MoodJournal.db");
+        Console.WriteLine("Database Path: " + _dbPath);
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.UseSqlite($"Data Source={_dbPath}");
     }
 }

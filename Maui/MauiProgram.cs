@@ -1,4 +1,6 @@
-﻿using Maui.Lab10;
+﻿using Application.Interfaces;
+using Application.Services;
+using Infrastructure.Data;
 using Microsoft.Extensions.Logging;
 
 namespace Maui;
@@ -19,8 +21,23 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        builder.Services.AddScoped<IProductService, ProductService>();
-        
-        return builder.Build();
+        // Add DbContext
+        builder.Services.AddDbContext<JournalDbContext>();
+
+        // Add Data Access
+        builder.Services.AddScoped<IJournalDbAccess, JournalDbAccess>();
+
+        // Add Services
+        builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IJournalService, JournalService>();
+
+        var app = builder.Build();
+
+        // Ensure database is created
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<JournalDbContext>();
+        db.Database.EnsureCreated();
+
+        return app;
     }
 }
