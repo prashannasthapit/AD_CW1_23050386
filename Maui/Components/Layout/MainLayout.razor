@@ -1,6 +1,8 @@
 ﻿@inherits LayoutComponentBase
 @inject IJSRuntime JS
 @inject IUserService UserService
+@inject IThemeService ThemeService
+@implements IDisposable
 
 <div class="page">
     <div class="sidebar">
@@ -10,7 +12,7 @@
     <main>
         <div class="header-row px-4 d-flex justify-content-end align-items-center">
             <button class="btn btn-sm btn-outline-secondary me-3" @onclick="ToggleTheme">
-                @if (_currentTheme == "dark")
+                @if (ThemeService.CurrentTheme == "dark")
                 {
                     <span>☀️ Light</span>
                 }
@@ -29,39 +31,52 @@
 </div>
 
 @code {
-    private string _currentTheme = "light";
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            // Subscribe to theme changes
+            ThemeService.OnThemeChanged += OnThemeChanged;
+            
             // Check if user is logged in and has a theme preference
             var userResult = await UserService.GetCurrentUserAsync();
             if (userResult.Success && userResult.Data != null)
             {
-                _currentTheme = userResult.Data.Theme.ToLower();
+                ThemeService.SetTheme(userResult.Data.Theme.ToLower());
             }
             else
             {
-                _currentTheme = await JS.InvokeAsync<string>("getTheme");
+                var currentTheme = await JS.InvokeAsync<string>("getTheme");
+                ThemeService.SetTheme(currentTheme);
             }
             
-            await JS.InvokeVoidAsync("setTheme", _currentTheme);
+            await JS.InvokeVoidAsync("setTheme", ThemeService.CurrentTheme);
             StateHasChanged();
         }
     }
 
+    private async void OnThemeChanged()
+    {
+        await JS.InvokeVoidAsync("setTheme", ThemeService.CurrentTheme);
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task ToggleTheme()
     {
-        _currentTheme = _currentTheme == "light" ? "dark" : "light";
-        await JS.InvokeVoidAsync("setTheme", _currentTheme);
+        var newTheme = ThemeService.CurrentTheme == "light" ? "dark" : "light";
+        ThemeService.SetTheme(newTheme);
         
         // Update user theme preference if logged in
         var userResult = await UserService.GetCurrentUserAsync();
         if (userResult.Success && userResult.Data != null)
         {
-            var theme = _currentTheme == "dark" ? "Dark" : "Light";
+            var theme = newTheme == "dark" ? "Dark" : "Light";
             await UserService.UpdateThemeAsync(userResult.Data.Id, theme);
         }
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= OnThemeChanged;
     }
 }

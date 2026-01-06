@@ -6,7 +6,7 @@ namespace Application.Interfaces;
 public interface IUserService
 {
     Task<ServiceResult<UserDisplayModel>> LoginAsync(UserLoginModel model);
-    Task<ServiceResult<UserDisplayModel>> RegisterAsync(UserLoginModel model);
+    Task<ServiceResult<UserDisplayModel>> RegisterAsync(UserLoginModel model, string theme = "Light");
     Task<ServiceResult<UserDisplayModel>> GetCurrentUserAsync();
     Task<ServiceResult<UserDisplayModel>> GetUserByIdAsync(Guid id);
     Task<ServiceResult<List<UserDisplayModel>>> GetAllUsersAsync();

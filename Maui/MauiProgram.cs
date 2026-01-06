@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+﻿﻿using Application.Interfaces;
 using Application.Services;
 using Infrastructure.Data;
 using Microsoft.Extensions.Logging;
@@ -28,6 +28,7 @@ public static class MauiProgram
         builder.Services.AddScoped<IJournalDbAccess, JournalDbAccess>();
 
         // Add Services
+        builder.Services.AddSingleton<IThemeService, ThemeService>();
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IJournalService, JournalService>();
 

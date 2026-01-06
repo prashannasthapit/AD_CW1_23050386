@@ -19,12 +19,13 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
         return await context.Users.FindAsync(id);
     }
 
-    public async Task<User> CreateUserAsync(string username, string? hashedPin)
+    public async Task<User> CreateUserAsync(string username, string? hashedPin, string theme = "Light")
     {
         var user = new User
         {
             Username = username,
-            Pin = hashedPin
+            Pin = hashedPin,
+            Theme = theme
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();

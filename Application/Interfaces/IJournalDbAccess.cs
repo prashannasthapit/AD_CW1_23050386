@@ -7,7 +7,7 @@ public interface IJournalDbAccess
     // User / Auth
     Task<User?> GetUserByUsernameAsync(string username);
     Task<User?> GetUserByIdAsync(Guid id);
-    Task<User> CreateUserAsync(string username, string? hashedPin);
+    Task<User> CreateUserAsync(string username, string? hashedPin, string theme = "Light");
     Task<User> UpdateUserAsync(User user);
     Task DeleteUserAsync(Guid id);
     Task<User?> GetDefaultUserAsync();

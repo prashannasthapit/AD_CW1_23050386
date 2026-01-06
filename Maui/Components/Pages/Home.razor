@@ -1,6 +1,8 @@
 ﻿@page "/"
 @inject IUserService UserService
+@inject IThemeService ThemeService
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <h1>Journal App</h1>
 
@@ -27,6 +29,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        ThemeService.OnThemeChanged += OnThemeChanged;
+        await LoadUser();
+    }
+
+    private async Task LoadUser()
+    {
         var result = await UserService.GetCurrentUserAsync();
         if (result.Success)
         {
@@ -35,10 +43,21 @@ else
         _isLoading = false;
     }
 
+    private async void OnThemeChanged()
+    {
+        await LoadUser();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private void HandleLogout()
     {
         UserService.SetCurrentUser(null);
         _currentUser = null;
         Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= OnThemeChanged;
     }
 }

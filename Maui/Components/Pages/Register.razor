@@ -1,5 +1,6 @@
 @page "/register"
 @inject IUserService UserService
+@inject IThemeService ThemeService
 @inject NavigationManager Navigation
 
 <h3>Register</h3>
@@ -70,7 +71,9 @@
                 Pin = _pin
             };
 
-            var result = await UserService.RegisterAsync(model);
+            // Use the current theme when registering
+            var currentTheme = ThemeService.CurrentTheme == "dark" ? "Dark" : "Light";
+            var result = await UserService.RegisterAsync(model, currentTheme);
 
             if (result.Success)
             {
@@ -92,4 +95,3 @@
         }
     }
 }
-

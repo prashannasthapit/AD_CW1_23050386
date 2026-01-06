@@ -41,7 +41,7 @@ public class UserService(IJournalDbAccess dbAccess) : IUserService
         }
     }
 
-    public async Task<ServiceResult<UserDisplayModel>> RegisterAsync(UserLoginModel model)
+    public async Task<ServiceResult<UserDisplayModel>> RegisterAsync(UserLoginModel model, string theme = "Light")
     {
         try
         {
@@ -55,7 +55,7 @@ public class UserService(IJournalDbAccess dbAccess) : IUserService
                 return ServiceResult<UserDisplayModel>.Fail("Username already exists.");
 
             var hashedPin = HashPin(model.Pin);
-            var user = await dbAccess.CreateUserAsync(model.Username, hashedPin);
+            var user = await dbAccess.CreateUserAsync(model.Username, hashedPin, theme);
             
             var display = MapToDisplay(user);
             _currentUser = display;
