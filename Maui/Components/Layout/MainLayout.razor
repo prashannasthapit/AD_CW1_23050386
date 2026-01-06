@@ -1,58 +1,17 @@
 ﻿@inherits LayoutComponentBase
 
-<MudThemeProvider @ref="_mudThemeProvider" @bind-IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
-
-<MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@DrawerToggle" />
-        <MudText Typo="Typo.h6" Class="ml-3">Mood Journal</MudText>
-        <MudSpacer />
-        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
-                       Color="Color.Inherit" 
-                       OnClick="ToggleDarkMode" />
-    </MudAppBar>
-    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-        <MudDrawerHeader>
-            <MudStack Row="true" AlignItems="AlignItems.Center">
-                <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" Color="Color.Primary" />
-                <div>
-                    <MudText Typo="Typo.h6">Mood Journal</MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Track your daily thoughts</MudText>
-                </div>
-            </MudStack>
-        </MudDrawerHeader>
-        <MudDivider />
+<div class="page">
+    <div class="sidebar">
         <NavMenu/>
-    </MudDrawer>
-    <MudMainContent>
-        @Body
-    </MudMainContent>
-</MudLayout>
+    </div>
 
-@code {
-    private bool _drawerOpen = true;
-    private bool _isDarkMode = false;
-    private MudThemeProvider? _mudThemeProvider;
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </div>
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && _mudThemeProvider != null)
-        {
-            _isDarkMode = await _mudThemeProvider.GetSystemDarkModeAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private void DrawerToggle()
-    {
-        _drawerOpen = !_drawerOpen;
-    }
-
-    private void ToggleDarkMode()
-    {
-        _isDarkMode = !_isDarkMode;
-    }
-}
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
