@@ -1,0 +1,382 @@
+@page "/journal"
+@page "/journal/{EntryDate}"
+@inject IJournalService JournalService
+@inject IUserService UserService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using Domain.Entities
+@implements IAsyncDisposable
+
+<h3>@(_isEditing ? "Edit" : "Create") Journal Entry</h3>
+
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!_isLoggedIn)
+{
+    <p>Please <a href="/login">login</a> to create journal entries.</p>
+}
+else
+{
+    <div class="container mt-4">
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger">@_errorMessage</div>
+        }
+        
+        @if (!string.IsNullOrEmpty(_successMessage))
+        {
+            <div class="alert alert-success">@_successMessage</div>
+        }
+
+        <form @onsubmit="HandleSubmit">
+            <!-- Date -->
+            <div class="mb-3">
+                <label class="form-label">Entry Date</label>
+                <input type="date" class="form-control" @bind="_model.EntryDate" disabled="@_isEditing" />
+                <small class="text-muted">One entry per day allowed</small>
+            </div>
+
+            <!-- Title -->
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="_model.Title" placeholder="How was your day?" />
+            </div>
+
+            <!-- Content -->
+            <div class="mb-3">
+                <label class="form-label">Content</label>
+                <div id="quill-editor" style="min-height: 200px;"></div>
+            </div>
+
+            <!-- Primary Mood (Required) -->
+            <div class="mb-3">
+                <label class="form-label">Primary Mood <span class="text-danger">*</span></label>
+                <div class="row">
+                    <!-- Positive Moods -->
+                    <div class="col-md-4">
+                        <strong class="text-success">Positive</strong>
+                        @foreach (var mood in MoodExtensions.GetMoodsByCategory(MoodCategory.Positive))
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" 
+                                       name="primaryMood" value="@mood" 
+                                       checked="@(_model.PrimaryMood == mood)"
+                                       @onchange="@(() => _model.PrimaryMood = mood)" />
+                                <label class="form-check-label">@mood.GetEmoji() @mood</label>
+                            </div>
+                        }
+                    </div>
+                    <!-- Neutral Moods -->
+                    <div class="col-md-4">
+                        <strong class="text-primary">Neutral</strong>
+                        @foreach (var mood in MoodExtensions.GetMoodsByCategory(MoodCategory.Neutral))
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" 
+                                       name="primaryMood" value="@mood" 
+                                       checked="@(_model.PrimaryMood == mood)"
+                                       @onchange="@(() => _model.PrimaryMood = mood)" />
+                                <label class="form-check-label">@mood.GetEmoji() @mood</label>
+                            </div>
+                        }
+                    </div>
+                    <!-- Negative Moods -->
+                    <div class="col-md-4">
+                        <strong class="text-danger">Negative</strong>
+                        @foreach (var mood in MoodExtensions.GetMoodsByCategory(MoodCategory.Negative))
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" 
+                                       name="primaryMood" value="@mood" 
+                                       checked="@(_model.PrimaryMood == mood)"
+                                       @onchange="@(() => _model.PrimaryMood = mood)" />
+                                <label class="form-check-label">@mood.GetEmoji() @mood</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secondary Moods (Optional, max 2) -->
+            <div class="mb-3">
+                <label class="form-label">Secondary Moods (Optional, max 2)</label>
+                <div class="row">
+                    @foreach (var mood in Enum.GetValues<Mood>())
+                    {
+                        @if (mood != _model.PrimaryMood)
+                        {
+                            <div class="col-md-4 col-lg-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           checked="@(_selectedSecondaryMoods.Contains(mood))"
+                                           disabled="@(!_selectedSecondaryMoods.Contains(mood) && _selectedSecondaryMoods.Count >= 2)"
+                                           @onchange="@(e => ToggleSecondaryMood(mood, (bool)e.Value!))" />
+                                    <label class="form-check-label">@mood.GetEmoji() @mood</label>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Category -->
+            <div class="mb-3">
+                <label class="form-label">Category</label>
+                <select class="form-select" @bind="_selectedCategoryId">
+                    <option value="">-- Select Category --</option>
+                    @foreach (var category in _categories)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Tags -->
+            <div class="mb-3">
+                <label class="form-label">Tags</label>
+                <div class="row">
+                    @foreach (var tag in _tags)
+                    {
+                        <div class="col-md-4 col-lg-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" 
+                                       checked="@(_selectedTagIds.Contains(tag.Id))"
+                                       @onchange="@(e => ToggleTag(tag.Id, (bool)e.Value!))" />
+                                <label class="form-check-label">@tag.Name</label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="mb-3">
+                <button type="submit" class="btn btn-primary" disabled="@_isSaving">
+                    @if (_isSaving)
+                    {
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>@(_isEditing ? "Update" : "Save") Entry</span>
+                    }
+                </button>
+                @if (_isEditing)
+                {
+                    <button type="button" class="btn btn-danger ms-2" @onclick="HandleDelete" disabled="@_isSaving">
+                        Delete Entry
+                    </button>
+                }
+                <button type="button" class="btn btn-secondary ms-2" @onclick="HandleCancel">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+}
+
+@code {
+    [Parameter] public string? EntryDate { get; set; }
+    
+    private JournalEntryInputModel _model = new();
+    private List<CategoryDisplayModel> _categories = new();
+    private List<TagDisplayModel> _tags = new();
+    private HashSet<Mood> _selectedSecondaryMoods = new();
+    private HashSet<Guid> _selectedTagIds = new();
+    private string _selectedCategoryId = "";
+    
+    private bool _isLoading = true;
+    private bool _isLoggedIn;
+    private bool _isEditing;
+    private bool _isSaving;
+    private bool _quillInitialized;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResult = await UserService.GetCurrentUserAsync();
+        _isLoggedIn = userResult.Success && userResult.Data != null;
+        
+        if (!_isLoggedIn)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        // Load categories and tags
+        var categoriesResult = await JournalService.GetAllCategoriesAsync();
+        if (categoriesResult.Success)
+            _categories = categoriesResult.Data ?? new();
+
+        var tagsResult = await JournalService.GetAllTagsAsync();
+        if (tagsResult.Success)
+            _tags = tagsResult.Data ?? new();
+
+        // Ensure prebuilt tags exist
+        await JournalService.EnsurePrebuiltTagsAsync();
+        tagsResult = await JournalService.GetAllTagsAsync();
+        if (tagsResult.Success)
+            _tags = tagsResult.Data ?? new();
+
+        // Check if editing existing entry
+        if (!string.IsNullOrEmpty(EntryDate) && DateTime.TryParse(EntryDate, out var date))
+        {
+            var entryResult = await JournalService.GetEntryByDateAsync(date);
+            if (entryResult.Success && entryResult.Data != null)
+            {
+                _isEditing = true;
+                PopulateFromDisplayModel(entryResult.Data);
+            }
+            else
+            {
+                _model.EntryDate = date;
+            }
+        }
+        else
+        {
+            // Check if today's entry exists
+            var todayResult = await JournalService.GetEntryByDateAsync(DateTime.Today);
+            if (todayResult.Success && todayResult.Data != null)
+            {
+                _isEditing = true;
+                PopulateFromDisplayModel(todayResult.Data);
+            }
+        }
+
+        _isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isLoggedIn && !_quillInitialized && !_isLoading)
+        {
+            _quillInitialized = await JS.InvokeAsync<bool>("initQuill", "quill-editor");
+            if (_quillInitialized && !string.IsNullOrEmpty(_model.Content))
+            {
+                await JS.InvokeVoidAsync("setQuillContent", _model.Content);
+            }
+        }
+    }
+
+    private void PopulateFromDisplayModel(JournalEntryDisplayModel display)
+    {
+        _model = new JournalEntryInputModel
+        {
+            Id = display.Id,
+            EntryDate = display.EntryDate,
+            Title = display.Title,
+            Content = display.Content,
+            IsMarkdown = true,
+            PrimaryMood = display.PrimaryMood,
+            CategoryId = display.CategoryId
+        };
+        
+        _selectedSecondaryMoods = new HashSet<Mood>(display.SecondaryMoods);
+        _selectedTagIds = new HashSet<Guid>(display.Tags.Select(t => t.Id));
+        _selectedCategoryId = display.CategoryId?.ToString() ?? "";
+    }
+
+    private void ToggleSecondaryMood(Mood mood, bool isChecked)
+    {
+        if (isChecked && _selectedSecondaryMoods.Count < 2)
+        {
+            _selectedSecondaryMoods.Add(mood);
+        }
+        else
+        {
+            _selectedSecondaryMoods.Remove(mood);
+        }
+    }
+
+    private void ToggleTag(Guid tagId, bool isChecked)
+    {
+        if (isChecked)
+            _selectedTagIds.Add(tagId);
+        else
+            _selectedTagIds.Remove(tagId);
+    }
+
+    private async Task HandleSubmit()
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        _isSaving = true;
+
+        try
+        {
+            // Get content from Quill editor
+            _model.Content = await JS.InvokeAsync<string>("getQuillContent");
+            _model.IsMarkdown = false; // Quill uses HTML
+            
+            _model.SecondaryMoods = _selectedSecondaryMoods.ToList();
+            _model.TagIds = _selectedTagIds.ToList();
+            _model.CategoryId = Guid.TryParse(_selectedCategoryId, out var catId) ? catId : null;
+
+            var result = await JournalService.AddOrUpdateEntryAsync(_model);
+            
+            if (result.Success)
+            {
+                _successMessage = _isEditing ? "Entry updated successfully!" : "Entry created successfully!";
+                _isEditing = true;
+                _model.Id = result.Data?.Id;
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        if (_model.Id == null) return;
+        
+        _isSaving = true;
+        _errorMessage = null;
+        
+        try
+        {
+            var result = await JournalService.DeleteEntryAsync(_model.Id.Value);
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void HandleCancel()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_quillInitialized)
+        {
+            await JS.InvokeVoidAsync("destroyQuill");
+        }
+    }
+}

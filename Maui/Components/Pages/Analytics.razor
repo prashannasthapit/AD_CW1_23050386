@@ -1,0 +1,373 @@
+@page "/analytics"
+@inject IJournalService JournalService
+@inject IUserService UserService
+@using Domain.Entities
+
+<h3>Journal Analytics</h3>
+
+@if (_isLoading)
+{
+    <p>Loading analytics...</p>
+}
+else if (!_isLoggedIn)
+{
+    <p>Please <a href="/login">login</a> to view analytics.</p>
+}
+else
+{
+    <div class="container mt-4">
+        <!-- Date Range Filter -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Filter by Date Range</strong>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">From</label>
+                        <input type="date" class="form-control" @bind="_fromDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">To</label>
+                        <input type="date" class="form-control" @bind="_toDate" />
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary" @onclick="LoadAnalytics">Apply Filter</button>
+                        <button class="btn btn-secondary ms-2" @onclick="ResetFilter">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger">@_errorMessage</div>
+        }
+
+        <!-- Streak Information -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Current Streak 🔥</h5>
+                        <p class="display-4">@_streakInfo.CurrentStreak</p>
+                        <p class="text-muted">consecutive days</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Longest Streak 🏆</h5>
+                        <p class="display-4">@_streakInfo.LongestStreak</p>
+                        <p class="text-muted">days achieved</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Entries 📝</h5>
+                        <p class="display-4">@_streakInfo.TotalEntries</p>
+                        <p class="text-muted">journal entries</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mood Distribution -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Mood Distribution by Category</strong>
+                    </div>
+                    <div class="card-body">
+                        @if (_moodDistribution.CategoryCounts.Values.Sum() > 0)
+                        {
+                            @foreach (var category in _moodDistribution.CategoryCounts)
+                            {
+                                var total = _moodDistribution.CategoryCounts.Values.Sum();
+                                var percentage = total > 0 ? (category.Value * 100.0 / total) : 0;
+                                var color = category.Key.GetCategoryColor();
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span>@category.Key</span>
+                                        <span>@category.Value (@percentage.ToString("F1")%)</span>
+                                    </div>
+                                    <div class="progress">
+                                        <div class="progress-bar" 
+                                             role="progressbar" 
+                                             style="width: @percentage%; background-color: @color;"
+                                             aria-valuenow="@percentage" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No mood data available for this period.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Mood Breakdown</strong>
+                    </div>
+                    <div class="card-body">
+                        @if (_moodDistribution.MoodCounts.Any())
+                        {
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Mood</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var mood in _moodDistribution.MoodCounts.OrderByDescending(m => m.Value))
+                                    {
+                                        <tr>
+                                            <td>@mood.Key.GetEmoji() @mood.Key</td>
+                                            <td>@mood.Value</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            
+                            @if (_moodDistribution.MostFrequentMood.HasValue)
+                            {
+                                <div class="alert alert-info">
+                                    <strong>Most Frequent Mood:</strong> 
+                                    @_moodDistribution.MostFrequentMood.Value.GetEmoji() 
+                                    @_moodDistribution.MostFrequentMood.Value
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No mood data available for this period.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tag Usage -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Most Used Tags (Top 10)</strong>
+                    </div>
+                    <div class="card-body">
+                        @if (_tagUsage.TagCounts.Any())
+                        {
+                            var maxCount = _tagUsage.TagCounts.Values.Max();
+                            @foreach (var tag in _tagUsage.TagCounts.OrderByDescending(t => t.Value))
+                            {
+                                var percentage = maxCount > 0 ? (tag.Value * 100.0 / maxCount) : 0;
+                                
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="badge bg-secondary">@tag.Key</span>
+                                        <span>@tag.Value</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-info" 
+                                             role="progressbar" 
+                                             style="width: @percentage%;"
+                                             aria-valuenow="@percentage" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No tag data available for this period.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Word Count Trends -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>Word Count Trends</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center mb-3">
+                            <div class="col-6">
+                                <h5>@_wordCountTrend.TotalWords</h5>
+                                <small class="text-muted">Total Words</small>
+                            </div>
+                            <div class="col-6">
+                                <h5>@_wordCountTrend.AverageWordsPerDay.ToString("F0")</h5>
+                                <small class="text-muted">Avg Words/Day</small>
+                            </div>
+                        </div>
+                        
+                        @if (_wordCountTrend.DailyWordCounts.Any())
+                        {
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Words</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var entry in _wordCountTrend.DailyWordCounts.OrderByDescending(w => w.Key).Take(10))
+                                    {
+                                        <tr>
+                                            <td>@entry.Key.ToString("MMM dd, yyyy")</td>
+                                            <td>@entry.Value</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No word count data available for this period.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Missed Days -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Missed Days</strong>
+            </div>
+            <div class="card-body">
+                @if (_missedDays.Any())
+                {
+                    <p>You missed <strong>@_missedDays.Count</strong> days in the selected period.</p>
+                    <div class="row">
+                        @foreach (var date in _missedDays.Take(30))
+                        {
+                            <div class="col-auto mb-2">
+                                <a href="/journal/@date.ToString("yyyy-MM-dd")" class="badge bg-warning text-dark text-decoration-none">
+                                    @date.ToString("MMM dd")
+                                </a>
+                            </div>
+                        }
+                        @if (_missedDays.Count > 30)
+                        {
+                            <div class="col-12">
+                                <small class="text-muted">...and @(_missedDays.Count - 30) more days</small>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-success">🎉 No missed days in the selected period! Great job!</p>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+    
+    private StreakDisplayModel _streakInfo = new();
+    private MoodDistributionModel _moodDistribution = new();
+    private TagUsageModel _tagUsage = new();
+    private WordCountTrendModel _wordCountTrend = new();
+    private List<DateTime> _missedDays = new();
+    
+    private bool _isLoading = true;
+    private bool _isLoggedIn;
+    private string? _errorMessage;
+    private DateTime _userRegisteredDate = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResult = await UserService.GetCurrentUserAsync();
+        _isLoggedIn = userResult.Success && userResult.Data != null;
+        
+        if (!_isLoggedIn)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        // Get user registration date
+        if (userResult.Data != null && DateTime.TryParse(userResult.Data.CreatedAt, out var registeredDate))
+        {
+            _userRegisteredDate = registeredDate.Date;
+        }
+
+        // Default to last 30 days
+        _toDate = DateTime.Today;
+        _fromDate = DateTime.Today.AddDays(-30);
+        
+        await LoadAnalytics();
+        _isLoading = false;
+    }
+
+    private async Task LoadAnalytics()
+    {
+        _errorMessage = null;
+        
+        try
+        {
+            // Load streak info (always uses today as reference)
+            var streakResult = await JournalService.GetStreakInfoAsync(DateTime.Today);
+            if (streakResult.Success)
+                _streakInfo = streakResult.Data ?? new();
+
+            // Load mood distribution with date filter
+            var moodResult = await JournalService.GetMoodDistributionAsync(_fromDate, _toDate);
+            if (moodResult.Success)
+                _moodDistribution = moodResult.Data ?? new();
+
+            // Load tag usage with date filter
+            var tagResult = await JournalService.GetTagUsageAsync(_fromDate, _toDate, 10);
+            if (tagResult.Success)
+                _tagUsage = tagResult.Data ?? new();
+
+            // Load word count trends
+            if (_fromDate.HasValue && _toDate.HasValue)
+            {
+                var wordCountResult = await JournalService.GetWordCountTrendsAsync(_fromDate.Value, _toDate.Value);
+                if (wordCountResult.Success)
+                    _wordCountTrend = wordCountResult.Data ?? new();
+
+                // Load missed days - start from user registration date or filter from date, whichever is later
+                var effectiveFromDate = _fromDate.Value > _userRegisteredDate ? _fromDate.Value : _userRegisteredDate;
+                var missedResult = await JournalService.GetMissedDaysAsync(effectiveFromDate, _toDate.Value);
+                if (missedResult.Success)
+                    _missedDays = missedResult.Data ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task ResetFilter()
+    {
+        _toDate = DateTime.Today;
+        _fromDate = DateTime.Today.AddDays(-30);
+        await LoadAnalytics();
+    }
+}
+

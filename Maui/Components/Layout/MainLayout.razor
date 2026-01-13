@@ -37,7 +37,7 @@
         {
             // Subscribe to theme changes
             ThemeService.OnThemeChanged += OnThemeChanged;
-            
+
             // Check if user is logged in and has a theme preference
             var userResult = await UserService.GetCurrentUserAsync();
             if (userResult.Success && userResult.Data != null)

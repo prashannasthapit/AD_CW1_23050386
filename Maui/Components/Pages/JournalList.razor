@@ -1,0 +1,212 @@
+@page "/entries"
+@inject IJournalService JournalService
+@inject IUserService UserService
+@inject NavigationManager Navigation
+@using Domain.Entities
+
+<h3>Journal Entries</h3>
+
+@if (_isLoading)
+{
+    <p>Loading entries...</p>
+}
+else if (!_isLoggedIn)
+{
+    <p>Please <a href="/login">login</a> to view your journal entries.</p>
+}
+else
+{
+    <div class="container mt-4">
+        <!-- Search & Filter -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Search & Filter</strong>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Search</label>
+                        <input type="text" class="form-control" @bind="_searchModel.Query" placeholder="Search content..." />
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">From</label>
+                        <input type="date" class="form-control" @bind="_fromDate" />
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">To</label>
+                        <input type="date" class="form-control" @bind="_toDate" />
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Mood</label>
+                        <select class="form-select" @bind="_selectedMood">
+                            <option value="">All Moods</option>
+                            @foreach (var mood in Enum.GetValues<Mood>())
+                            {
+                                <option value="@mood">@mood.GetEmoji() @mood</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-2 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" @onclick="Search">Search</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span>Total: <strong>@_searchResult.TotalCount</strong> entries</span>
+            <a href="/journal" class="btn btn-success">+ New Entry</a>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger">@_errorMessage</div>
+        }
+
+        @if (_searchResult.Entries.Any())
+        {
+            <div class="list-group">
+                @foreach (var entry in _searchResult.Entries)
+                {
+                    <a href="/journal/@entry.EntryDate.ToString("yyyy-MM-dd")" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">
+                                @entry.PrimaryMood.GetEmoji() 
+                                @(string.IsNullOrWhiteSpace(entry.Title) ? entry.EntryDate.ToString("MMMM dd, yyyy") : entry.Title)
+                            </h5>
+                            <small>@entry.EntryDate.ToString("MMM dd, yyyy")</small>
+                        </div>
+                        <p class="mb-1 text-truncate">@GetPlainTextPreview(entry.Content, 100)</p>
+                        <small>
+                            <span class="badge" style="background-color: @entry.PrimaryMoodCategory.GetCategoryColor();">@entry.PrimaryMood</span>
+                            @if (!string.IsNullOrEmpty(entry.CategoryName))
+                            {
+                                <span class="badge bg-secondary ms-1">@entry.CategoryName</span>
+                            }
+                            @foreach (var tag in entry.Tags.Take(3))
+                            {
+                                <span class="badge bg-info ms-1">@tag.Name</span>
+                            }
+                            @if (entry.Tags.Count > 3)
+                            {
+                                <span class="badge bg-light text-dark ms-1">+@(entry.Tags.Count - 3) more</span>
+                            }
+                            <span class="ms-2 text-muted">@entry.WordCount words</span>
+                        </small>
+                    </a>
+                }
+            </div>
+
+            <!-- Pagination -->
+            @if (_searchResult.TotalPages > 1)
+            {
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item @(_searchModel.Page <= 1 ? "disabled" : "")">
+                            <button class="page-link" @onclick="() => GoToPage(_searchModel.Page - 1)">Previous</button>
+                        </li>
+                        @for (int i = 1; i <= Math.Min(_searchResult.TotalPages, 5); i++)
+                        {
+                            var pageNum = i;
+                            <li class="page-item @(_searchModel.Page == pageNum ? "active" : "")">
+                                <button class="page-link" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                            </li>
+                        }
+                        <li class="page-item @(_searchModel.Page >= _searchResult.TotalPages ? "disabled" : "")">
+                            <button class="page-link" @onclick="() => GoToPage(_searchModel.Page + 1)">Next</button>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        }
+        else
+        {
+            <div class="alert alert-info">
+                <p>No journal entries found.</p>
+                <a href="/journal" class="btn btn-primary">Create Your First Entry</a>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private JournalSearchModel _searchModel = new() { PageSize = 10 };
+    private JournalSearchResultModel _searchResult = new();
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+    private string _selectedMood = "";
+    
+    private bool _isLoading = true;
+    private bool _isLoggedIn;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResult = await UserService.GetCurrentUserAsync();
+        _isLoggedIn = userResult.Success && userResult.Data != null;
+        
+        if (!_isLoggedIn)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        await Search();
+        _isLoading = false;
+    }
+
+    private async Task Search()
+    {
+        _errorMessage = null;
+        
+        try
+        {
+            _searchModel.From = _fromDate;
+            _searchModel.To = _toDate;
+            
+            if (!string.IsNullOrEmpty(_selectedMood) && Enum.TryParse<Mood>(_selectedMood, out var mood))
+            {
+                _searchModel.Moods = new List<Mood> { mood };
+            }
+            else
+            {
+                _searchModel.Moods = null;
+            }
+
+            var result = await JournalService.SearchAsync(_searchModel);
+            if (result.Success)
+            {
+                _searchResult = result.Data ?? new();
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > _searchResult.TotalPages) return;
+        
+        _searchModel.Page = page;
+        await Search();
+    }
+
+    private string GetPlainTextPreview(string content, int maxLength)
+    {
+        if (string.IsNullOrEmpty(content)) return "";
+        
+        // Strip HTML tags
+        var plainText = System.Text.RegularExpressions.Regex.Replace(content, "<[^>]*>", " ");
+        plainText = System.Net.WebUtility.HtmlDecode(plainText);
+        plainText = System.Text.RegularExpressions.Regex.Replace(plainText, @"\s+", " ").Trim();
+        
+        return plainText.Length > maxLength ? plainText.Substring(0, maxLength) + "..." : plainText;
+    }
+}
+

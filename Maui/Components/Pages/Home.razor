@@ -1,6 +1,7 @@
 ﻿@page "/"
 @inject IUserService UserService
 @inject IThemeService ThemeService
+@inject IJournalService JournalService
 @inject NavigationManager Navigation
 @implements IDisposable
 
@@ -16,15 +17,89 @@ else if (_currentUser == null)
 }
 else
 {
-    <p>Welcome, <strong>@_currentUser.Username</strong>!</p>
-    <p>Theme: @_currentUser.Theme</p>
-    <p>Account created: @_currentUser.CreatedAt</p>
-    
-    <button @onclick="HandleLogout">Logout</button>
+    <div class="container">
+        <p>Welcome, <strong>@_currentUser.Username</strong>!</p>
+        
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        @if (_hasTodayEntry)
+                        {
+                            <h5 class="card-title">✅ Today's Entry Complete!</h5>
+                            <p class="card-text">You've already written today.</p>
+                            <a href="/journal" class="btn btn-outline-primary">Edit Today's Entry</a>
+                        }
+                        else
+                        {
+                            <h5 class="card-title">📝 Write Today's Entry</h5>
+                            <p class="card-text">You haven't written today. Start journaling!</p>
+                            <a href="/journal" class="btn btn-primary">Write Today's Entry</a>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">📊 Analytics</h5>
+                        <p class="card-text">View your journaling insights and mood trends.</p>
+                        <a href="/analytics" class="btn btn-info">View Analytics</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Streak Info -->
+        @if (_streakInfo != null)
+        {
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle text-muted">Current Streak 🔥</h6>
+                            <h2 class="mt-2">@_streakInfo.CurrentStreak</h2>
+                            <small>days</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle text-muted">Longest Streak 🏆</h6>
+                            <h2 class="mt-2">@_streakInfo.LongestStreak</h2>
+                            <small>days</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle text-muted">Total Entries 📝</h6>
+                            <h2 class="mt-2">@_streakInfo.TotalEntries</h2>
+                            <small>entries</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-12">
+                <a href="/entries" class="btn btn-outline-secondary me-2">📖 Browse All Entries</a>
+                <button class="btn btn-outline-danger" @onclick="HandleLogout">Logout</button>
+            </div>
+        </div>
+        
+        <p class="text-muted mt-3"><small>Theme: @_currentUser.Theme | Account created: @_currentUser.CreatedAt</small></p>
+    </div>
 }
 
 @code {
     private UserDisplayModel? _currentUser;
+    private StreakDisplayModel? _streakInfo;
+    private bool _hasTodayEntry;
     private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
@@ -39,6 +114,15 @@ else
         if (result.Success)
         {
             _currentUser = result.Data;
+            
+            // Load streak info and today's entry status
+            var streakResult = await JournalService.GetStreakInfoAsync(DateTime.Today);
+            if (streakResult.Success)
+                _streakInfo = streakResult.Data;
+            
+            var todayResult = await JournalService.HasEntryForDateAsync(DateTime.Today);
+            if (todayResult.Success)
+                _hasTodayEntry = todayResult.Data;
         }
         _isLoading = false;
     }

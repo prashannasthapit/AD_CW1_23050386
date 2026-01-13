@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="Maui.styles.css" />
     <link rel="icon" href="data:,">
+    <!-- Quill.js -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
 </head>
 
 <body>
@@ -24,6 +26,8 @@
     </div>
 
     <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <!-- Quill.js -->
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
     
     <script>
         window.setTheme = (theme) => {
@@ -32,6 +36,47 @@
         
         window.getTheme = () => {
             return document.documentElement.getAttribute('data-bs-theme') || 'light';
+        };
+
+        // Quill editor instance
+        window.quillEditor = null;
+
+        window.initQuill = (elementId) => {
+            const container = document.getElementById(elementId);
+            if (!container) return false;
+
+            window.quillEditor = new Quill('#' + elementId, {
+                theme: 'snow',
+                modules: {
+                    toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['blockquote', 'code-block'],
+                        ['link'],
+                        ['clean']
+                    ]
+                },
+                placeholder: 'Write your thoughts...'
+            });
+            return true;
+        };
+
+        window.getQuillContent = () => {
+            if (window.quillEditor) {
+                return window.quillEditor.root.innerHTML;
+            }
+            return '';
+        };
+
+        window.setQuillContent = (html) => {
+            if (window.quillEditor) {
+                window.quillEditor.root.innerHTML = html || '';
+            }
+        };
+
+        window.destroyQuill = () => {
+            window.quillEditor = null;
         };
     </script>
 
