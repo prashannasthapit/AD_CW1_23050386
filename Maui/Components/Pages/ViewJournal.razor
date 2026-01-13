@@ -1,0 +1,145 @@
+@page "/journal/view/{EntryDate}"
+@inject IJournalService JournalService
+@inject IUserService UserService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using Domain.Entities
+
+<h3>View Journal Entry</h3>
+
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!_isLoggedIn)
+{
+    <p>Please <a href="/login">login</a> to view journal entries.</p>
+}
+else if (_entry == null)
+{
+    <div class="alert alert-warning">
+        <p>No journal entry found for this date.</p>
+        <a href="/" class="btn btn-primary">Back to Home</a>
+    </div>
+}
+else
+{
+    <div class="container mt-4">
+        <!-- Header with date and actions -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4>@_entry.Title</h4>
+                <small class="text-muted">@_entry.EntryDate.ToString("dddd, MMMM d, yyyy")</small>
+            </div>
+            <div>
+                <button class="btn btn-primary" @onclick="EditEntry">✏️ Edit</button>
+                <button class="btn btn-secondary ms-2" @onclick="GoBack">← Back</button>
+            </div>
+        </div>
+
+        <!-- Mood Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Mood</strong>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-primary fs-6">
+                        @_entry.PrimaryMood.GetEmoji() @_entry.PrimaryMood (Primary)
+                    </span>
+                    @foreach (var mood in _entry.SecondaryMoods)
+                    {
+                        <span class="badge bg-secondary fs-6">
+                            @mood.GetEmoji() @mood
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Tags Section -->
+        @if (_entry.Tags.Any())
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <strong>Tags</strong>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var tag in _entry.Tags)
+                        {
+                            <span class="badge bg-info text-dark">@tag.Name</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Content Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Journal Content</strong>
+            </div>
+            <div class="card-body">
+                <div id="journal-content">
+                    @((MarkupString)_entry.Content)
+                </div>
+            </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="text-muted small">
+            <p>Created: @_entry.CreatedAt</p>
+            @if (_entry.UpdatedAt != _entry.CreatedAt)
+            {
+                <p>Last Updated: @_entry.UpdatedAt</p>
+            }
+            <p>Word Count: @_entry.WordCount words</p>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string? EntryDate { get; set; }
+    
+    private JournalEntryDisplayModel? _entry;
+    private bool _isLoading = true;
+    private bool _isLoggedIn;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userResult = await UserService.GetCurrentUserAsync();
+        _isLoggedIn = userResult.Success && userResult.Data != null;
+        
+        if (!_isLoggedIn)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(EntryDate) && DateTime.TryParse(EntryDate, out var date))
+        {
+            var entryResult = await JournalService.GetEntryByDateAsync(date);
+            if (entryResult.Success && entryResult.Data != null)
+            {
+                _entry = entryResult.Data;
+            }
+        }
+
+        _isLoading = false;
+    }
+
+    private void EditEntry()
+    {
+        if (_entry != null)
+        {
+            Navigation.NavigateTo($"/journal/{_entry.EntryDate:yyyy-MM-dd}");
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+}
+

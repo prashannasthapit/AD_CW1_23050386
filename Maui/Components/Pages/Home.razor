@@ -29,7 +29,8 @@ else
                         {
                             <h5 class="card-title">✅ Today's Entry Complete!</h5>
                             <p class="card-text">You've already written today.</p>
-                            <a href="/journal" class="btn btn-outline-primary">Edit Today's Entry</a>
+                            <a href="/journal/view/@DateTime.Today.ToString("yyyy-MM-dd")" class="btn btn-outline-primary">View Today's Entry</a>
+                            <a href="/journal" class="btn btn-outline-secondary ms-2">Edit</a>
                         }
                         else
                         {

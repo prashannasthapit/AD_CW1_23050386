@@ -121,17 +121,6 @@ else
                 </div>
             </div>
 
-            <!-- Category -->
-            <div class="mb-3">
-                <label class="form-label">Category</label>
-                <select class="form-select" @bind="_selectedCategoryId">
-                    <option value="">-- Select Category --</option>
-                    @foreach (var category in _categories)
-                    {
-                        <option value="@category.Id">@category.Name</option>
-                    }
-                </select>
-            </div>
 
             <!-- Tags -->
             <div class="mb-3">
@@ -181,11 +170,9 @@ else
     [Parameter] public string? EntryDate { get; set; }
     
     private JournalEntryInputModel _model = new();
-    private List<CategoryDisplayModel> _categories = new();
     private List<TagDisplayModel> _tags = new();
     private HashSet<Mood> _selectedSecondaryMoods = new();
     private HashSet<Guid> _selectedTagIds = new();
-    private string _selectedCategoryId = "";
     
     private bool _isLoading = true;
     private bool _isLoggedIn;
@@ -206,11 +193,7 @@ else
             return;
         }
 
-        // Load categories and tags
-        var categoriesResult = await JournalService.GetAllCategoriesAsync();
-        if (categoriesResult.Success)
-            _categories = categoriesResult.Data ?? new();
-
+        // Load tags
         var tagsResult = await JournalService.GetAllTagsAsync();
         if (tagsResult.Success)
             _tags = tagsResult.Data ?? new();
@@ -270,13 +253,11 @@ else
             Title = display.Title,
             Content = display.Content,
             IsMarkdown = true,
-            PrimaryMood = display.PrimaryMood,
-            CategoryId = display.CategoryId
+            PrimaryMood = display.PrimaryMood
         };
         
         _selectedSecondaryMoods = new HashSet<Mood>(display.SecondaryMoods);
         _selectedTagIds = new HashSet<Guid>(display.Tags.Select(t => t.Id));
-        _selectedCategoryId = display.CategoryId?.ToString() ?? "";
     }
 
     private void ToggleSecondaryMood(Mood mood, bool isChecked)
@@ -313,7 +294,6 @@ else
             
             _model.SecondaryMoods = _selectedSecondaryMoods.ToList();
             _model.TagIds = _selectedTagIds.ToList();
-            _model.CategoryId = Guid.TryParse(_selectedCategoryId, out var catId) ? catId : null;
 
             var result = await JournalService.AddOrUpdateEntryAsync(_model);
             

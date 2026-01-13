@@ -68,7 +68,7 @@ else
             <div class="list-group">
                 @foreach (var entry in _searchResult.Entries)
                 {
-                    <a href="/journal/@entry.EntryDate.ToString("yyyy-MM-dd")" class="list-group-item list-group-item-action">
+                    <a href="/journal/view/@entry.EntryDate.ToString("yyyy-MM-dd")" class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between">
                             <h5 class="mb-1">
                                 @entry.PrimaryMood.GetEmoji() 
@@ -79,10 +79,6 @@ else
                         <p class="mb-1 text-truncate">@GetPlainTextPreview(entry.Content, 100)</p>
                         <small>
                             <span class="badge" style="background-color: @entry.PrimaryMoodCategory.GetCategoryColor();">@entry.PrimaryMood</span>
-                            @if (!string.IsNullOrEmpty(entry.CategoryName))
-                            {
-                                <span class="badge bg-secondary ms-1">@entry.CategoryName</span>
-                            }
                             @foreach (var tag in entry.Tags.Take(3))
                             {
                                 <span class="badge bg-info ms-1">@tag.Name</span>
