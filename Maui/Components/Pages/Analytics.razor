@@ -1,7 +1,11 @@
 @page "/analytics"
 @inject IJournalService JournalService
 @inject IUserService UserService
+@inject IJSRuntime JS
+@inject IPdfService PdfService
 @using Domain.Entities
+
+<script src="js/pdfUtils.js"></script>
 
 <h3>Journal Analytics</h3>
 
@@ -16,6 +20,9 @@ else if (!_isLoggedIn)
 else
 {
     <div class="container mt-4">
+        <!-- Export to PDF Button -->
+        <button class="btn btn-outline-secondary mb-3" @onclick="ExportToPdf">Export to PDF</button>
+
         <!-- Date Range Filter -->
         <div class="card mb-4">
             <div class="card-header">
@@ -373,5 +380,37 @@ else
         _toDate = DateTime.Today;
         _fromDate = DateTime.Today.AddDays(-30);
         await LoadAnalytics();
+    }
+
+    private async Task ExportToPdf()
+    {
+        Console.WriteLine("Exporting analytics to PDF...");
+        try
+        {
+            // var html = await JS.InvokeAsync<string>("eval", "document.documentElement.outerHTML");
+            string html = await JS.InvokeAsync<string>("getPageHtmlWithStyles");
+
+            // Base app sandbox folder
+            var appData = FileSystem.Current.AppDataDirectory;
+
+// Create "JournalExports" subfolder
+            var exportFolder = Path.Combine(appData, "JournalExports");
+            Directory.CreateDirectory(exportFolder); // ensures folder exists
+
+// Create a timestamped PDF file path
+            var filePath = Path.Combine(exportFolder, $"Export-{DateTime.Now:yyyyMMddHHmmss}.pdf");
+
+            await PdfService.GeneratePdfAsync(html, filePath);
+
+// Best approach: prepend "file://"
+            var fileUri = new Uri($"file://{filePath}");
+
+            await Launcher.Default.OpenAsync(fileUri);
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
     }
 }

@@ -58,6 +58,7 @@
 
     <ItemGroup>
       <_ContentIncludedByDefault Remove="wwwroot\sampledata\products.json" />
+      <_ContentIncludedByDefault Remove="wwwroot\js\print.js" />
     </ItemGroup>
 
 </Project>

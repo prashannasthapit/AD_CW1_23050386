@@ -2,6 +2,7 @@
 using Application.Services;
 using Infrastructure.Data;
 using Microsoft.Extensions.Logging;
+using PdfSharpCore.Fonts;
 
 namespace Maui;
 
@@ -20,7 +21,8 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
-
+        GlobalFontSettings.FontResolver = new MacFontResolver();
+        
         // Add DbContext
         builder.Services.AddDbContext<JournalDbContext>();
 
@@ -31,7 +33,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IThemeService, ThemeService>();
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IJournalService, JournalService>();
-
+        builder.Services.AddSingleton<IPdfService, PdfService>();
+        
         var app = builder.Build();
 
         // Ensure database is created
