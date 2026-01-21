@@ -112,18 +112,22 @@ else
     private async Task LoadUser()
     {
         var result = await UserService.GetCurrentUserAsync();
-        if (result.Success)
+        if (result.Success && result.Data != null)
         {
             _currentUser = result.Data;
-            
-            // Load streak info and today's entry status
+            // All service calls below are already user-protected in the backend
             var streakResult = await JournalService.GetStreakInfoAsync(DateTime.Today);
             if (streakResult.Success)
                 _streakInfo = streakResult.Data;
-            
             var todayResult = await JournalService.HasEntryForDateAsync(DateTime.Today);
             if (todayResult.Success)
                 _hasTodayEntry = todayResult.Data;
+        }
+        else
+        {
+            _currentUser = null;
+            _streakInfo = null;
+            _hasTodayEntry = false;
         }
         _isLoading = false;
     }

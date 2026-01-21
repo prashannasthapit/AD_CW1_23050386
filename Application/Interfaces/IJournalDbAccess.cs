@@ -15,7 +15,7 @@ public interface IJournalDbAccess
     
     // Journal Entry CRUD
     Task<JournalEntry?> GetEntryByIdAsync(Guid id);
-    Task<JournalEntry?> GetEntryByDateAsync(DateTime date);
+    Task<JournalEntry?> GetEntryByDateAsync(DateTime date, Guid userId);
     Task<JournalEntry> AddEntryAsync(JournalEntry entry);
     Task<JournalEntry> UpdateEntryAsync(JournalEntry entry);
     Task DeleteEntryAsync(Guid entryId);
@@ -29,22 +29,24 @@ public interface IJournalDbAccess
         IEnumerable<Guid>? tagIds,
         Guid? categoryId,
         int skip,
-        int take);
+        int take,
+        Guid userId);
     Task<int> GetEntriesCountAsync(
         string? query,
         DateTime? from,
         DateTime? to,
         IEnumerable<Mood>? moods,
         IEnumerable<Guid>? tagIds,
-        Guid? categoryId);
+        Guid? categoryId,
+        Guid userId);
     
     // Date helpers
-    Task<IList<DateTime>> GetDatesWithEntriesAsync(int year, int month);
-    Task<bool> HasEntryForDateAsync(DateTime date);
-    Task<int> GetTotalEntriesCountAsync();
+    Task<IList<DateTime>> GetDatesWithEntriesAsync(int year, int month, Guid userId);
+    Task<bool> HasEntryForDateAsync(DateTime date, Guid userId);
+    Task<int> GetTotalEntriesCountAsync(Guid userId);
     
     // Streak helpers
-    Task<IList<DateTime>> GetAllEntryDatesOrderedAsync();
+    Task<IList<DateTime>> GetAllEntryDatesOrderedAsync(Guid userId);
     
     // Mood queries
     Task<IList<(Mood Mood, int Count)>> GetMoodCountsAsync(DateTime? from, DateTime? to);

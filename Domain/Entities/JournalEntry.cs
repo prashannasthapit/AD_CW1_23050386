@@ -33,6 +33,9 @@ public class JournalEntry
     
     // Tags many-to-many via EntryTag
     public ICollection<EntryTag> EntryTags { get; set; } = new List<EntryTag>();
+
+    [Required]
+    public Guid UserId { get; set; } // The user who owns this entry
     
     [NotMapped]
     public int WordCount => string.IsNullOrWhiteSpace(Content) ? 0 : Content.Split(new[] {' ', '\n', '\r'}, StringSplitOptions.RemoveEmptyEntries).Length;

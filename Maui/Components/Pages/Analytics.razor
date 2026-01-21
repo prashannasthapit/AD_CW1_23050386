@@ -301,10 +301,15 @@ else
     {
         var userResult = await UserService.GetCurrentUserAsync();
         _isLoggedIn = userResult.Success && userResult.Data != null;
-        
         if (!_isLoggedIn)
         {
             _isLoading = false;
+            // Clear all analytics state if not logged in
+            _streakInfo = new();
+            _moodDistribution = new();
+            _tagUsage = new();
+            _wordCountTrend = new();
+            _missedDays = new();
             return;
         }
 
@@ -325,7 +330,7 @@ else
     private async Task LoadAnalytics()
     {
         _errorMessage = null;
-        
+        if (!_isLoggedIn) return;
         try
         {
             // Load streak info (always uses today as reference)
@@ -370,4 +375,3 @@ else
         await LoadAnalytics();
     }
 }
-

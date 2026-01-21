@@ -5,16 +5,30 @@ using Domain.Entities;
 
 namespace Application.Services;
 
-public class JournalService(IJournalDbAccess dbAccess) : IJournalService
+public class JournalService : IJournalService
 {
+    private readonly IJournalDbAccess dbAccess;
+    private readonly IUserService _userService;
+
+    public JournalService(IJournalDbAccess dbAccess, IUserService userService)
+    {
+        this.dbAccess = dbAccess;
+        _userService = userService;
+    }
+
     #region Entry CRUD
 
     public async Task<ServiceResult<JournalEntryDisplayModel>> GetEntryByIdAsync(Guid id)
     {
         try
         {
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<JournalEntryDisplayModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
             var entry = await dbAccess.GetEntryByIdAsync(id);
-            if (entry == null)
+            if (entry == null || entry.UserId != userId)
                 return ServiceResult<JournalEntryDisplayModel>.Fail("Entry not found.");
 
             return ServiceResult<JournalEntryDisplayModel>.Ok(MapToDisplay(entry));
@@ -29,8 +43,13 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
-            var entry = await dbAccess.GetEntryByDateAsync(date);
-            if (entry == null)
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<JournalEntryDisplayModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var entry = await dbAccess.GetEntryByDateAsync(date, userId);
+            if (entry == null || entry.UserId != userId)
                 return ServiceResult<JournalEntryDisplayModel>.Fail("No entry found for this date.");
 
             return ServiceResult<JournalEntryDisplayModel>.Ok(MapToDisplay(entry));
@@ -45,12 +64,17 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<JournalEntryDisplayModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
             JournalEntry entry;
             
             if (model.Id.HasValue)
             {
                 var existingEntry = await dbAccess.GetEntryByIdAsync(model.Id.Value);
-                if (existingEntry != null)
+                if (existingEntry != null && existingEntry.UserId == userId)
                 {
                     // Update existing entry
                     UpdateEntryFromModel(existingEntry, model);
@@ -61,8 +85,8 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
             }
             
             // Check if entry for date already exists
-            var entryForDate = await dbAccess.GetEntryByDateAsync(model.EntryDate);
-            if (entryForDate != null)
+            var entryForDate = await dbAccess.GetEntryByDateAsync(model.EntryDate, userId);
+            if (entryForDate != null && entryForDate.UserId == userId)
             {
                 // Update existing entry for this date
                 UpdateEntryFromModel(entryForDate, model);
@@ -73,6 +97,7 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
 
             // Create new entry
             entry = MapToEntity(model);
+            entry.UserId = userId;
             entry = await dbAccess.AddEntryAsync(entry);
             
             if (model.TagIds != null && model.TagIds.Count > 0)
@@ -93,8 +118,13 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<bool>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
             var entry = await dbAccess.GetEntryByIdAsync(entryId);
-            if (entry == null)
+            if (entry == null || entry.UserId != userId)
                 return ServiceResult<bool>.Fail("Entry not found.");
 
             await dbAccess.DeleteEntryAsync(entryId);
@@ -114,14 +144,19 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<JournalSearchResultModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
             var skip = (model.Page - 1) * model.PageSize;
             var entries = await dbAccess.GetEntriesAsync(
                 model.Query, model.From, model.To, 
                 model.Moods, model.TagIds, model.CategoryId, 
-                skip, model.PageSize);
+                skip, model.PageSize, userId);
             var totalCount = await dbAccess.GetEntriesCountAsync(
                 model.Query, model.From, model.To,
-                model.Moods, model.TagIds, model.CategoryId);
+                model.Moods, model.TagIds, model.CategoryId, userId);
 
             var result = new JournalSearchResultModel
             {
@@ -147,7 +182,12 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
-            var datesWithEntries = await dbAccess.GetDatesWithEntriesAsync(year, month);
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<CalendarDataModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var datesWithEntries = await dbAccess.GetDatesWithEntriesAsync(year, month, userId);
             
             // Calculate missed days for the month
             var startDate = new DateTime(year, month, 1);
@@ -155,7 +195,7 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
                 ? DateTime.Today 
                 : startDate.AddMonths(1).AddDays(-1);
             
-            var allDates = await dbAccess.GetAllEntryDatesOrderedAsync();
+            var allDates = await dbAccess.GetAllEntryDatesOrderedAsync(userId);
             var dateSet = new HashSet<DateTime>(allDates);
             var missedDays = new List<DateTime>();
             
@@ -169,7 +209,7 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
             {
                 Year = year,
                 Month = month,
-                DatesWithEntries = datesWithEntries.ToList(),
+                DatesWithEntries = datesWithEntries.Select(d => d.Date).ToList(),
                 MissedDays = missedDays
             };
 
@@ -185,7 +225,12 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
-            var hasEntry = await dbAccess.HasEntryForDateAsync(date);
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<bool>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var hasEntry = await dbAccess.HasEntryForDateAsync(date, userId);
             return ServiceResult<bool>.Ok(hasEntry);
         }
         catch (Exception ex)
@@ -202,9 +247,13 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
-            var dates = await dbAccess.GetAllEntryDatesOrderedAsync();
-            var totalEntries = await dbAccess.GetTotalEntriesCountAsync();
-            
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<StreakDisplayModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var dates = await dbAccess.GetAllEntryDatesOrderedAsync(userId);
+            var totalEntries = await dbAccess.GetTotalEntriesCountAsync(userId);
             var currentStreak = CalculateCurrentStreak(dates, asOf);
             var longestStreak = CalculateLongestStreak(dates);
 
@@ -227,7 +276,12 @@ public class JournalService(IJournalDbAccess dbAccess) : IJournalService
     {
         try
         {
-            var dates = await dbAccess.GetAllEntryDatesOrderedAsync();
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<List<DateTime>>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var dates = await dbAccess.GetAllEntryDatesOrderedAsync(userId);
             var dateSet = new HashSet<DateTime>(dates);
             var missedDays = new List<DateTime>();
 

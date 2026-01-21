@@ -72,14 +72,25 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
             .FirstOrDefaultAsync(e => e.Id == id);
     }
 
-    public async Task<JournalEntry?> GetEntryByDateAsync(DateTime date)
+    public async Task<JournalEntry?> GetEntryByDateAsync(DateTime date, Guid userId)
     {
         var dateOnly = date.Date;
-        return await context.JournalEntries
-            .Include(e => e.Category)
-            .Include(e => e.EntryTags)
-                .ThenInclude(et => et.Tag)
-            .FirstOrDefaultAsync(e => e.EntryDate.Date == dateOnly);
+        // if (userId)
+        // {
+            return await context.JournalEntries
+                .Include(e => e.Category)
+                .Include(e => e.EntryTags)
+                    .ThenInclude(et => et.Tag)
+                .FirstOrDefaultAsync(e => e.EntryDate.Date == dateOnly && e.UserId == userId);
+        // }
+        // else
+        // {
+        //     return await context.JournalEntries
+        //         .Include(e => e.Category)
+        //         .Include(e => e.EntryTags)
+        //             .ThenInclude(et => et.Tag)
+        //         .FirstOrDefaultAsync(e => e.EntryDate.Date == dateOnly);
+        // }
     }
 
     public async Task<JournalEntry> AddEntryAsync(JournalEntry entry)
@@ -119,9 +130,10 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
         IEnumerable<Guid>? tagIds,
         Guid? categoryId,
         int skip,
-        int take)
+        int take,
+        Guid userId)
     {
-        var q = BuildEntriesQuery(query, from, to, moods, tagIds, categoryId);
+        var q = BuildEntriesQuery(query, from, to, moods, tagIds, categoryId, userId);
         return await q
             .OrderByDescending(e => e.EntryDate)
             .Skip(skip)
@@ -138,9 +150,10 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
         DateTime? to,
         IEnumerable<Mood>? moods,
         IEnumerable<Guid>? tagIds,
-        Guid? categoryId)
+        Guid? categoryId,
+        Guid userId)
     {
-        var q = BuildEntriesQuery(query, from, to, moods, tagIds, categoryId);
+        var q = BuildEntriesQuery(query, from, to, moods, tagIds, categoryId, userId);
         return await q.CountAsync();
     }
 
@@ -150,48 +163,25 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
         DateTime? to,
         IEnumerable<Mood>? moods,
         IEnumerable<Guid>? tagIds,
-        Guid? categoryId)
+        Guid? categoryId,
+        Guid userId)
     {
         IQueryable<JournalEntry> q = context.JournalEntries;
-
+        q = q.Where(e => e.UserId == userId);
         if (!string.IsNullOrWhiteSpace(query))
-        {
             q = q.Where(e => e.Title.Contains(query) || e.Content.Contains(query));
-        }
-
         if (from.HasValue)
-        {
             q = q.Where(e => e.EntryDate >= from.Value.Date);
-        }
-
         if (to.HasValue)
-        {
             q = q.Where(e => e.EntryDate <= to.Value.Date);
-        }
-
-        if (moods != null)
-        {
-            var moodList = moods.ToList();
-            if (moodList.Count > 0)
-            {
-                q = q.Where(e => moodList.Contains(e.PrimaryMood));
-            }
-        }
-
-        if (tagIds != null)
-        {
-            var tagIdList = tagIds.ToList();
-            if (tagIdList.Count > 0)
-            {
-                q = q.Where(e => e.EntryTags.Any(et => tagIdList.Contains(et.TagId)));
-            }
-        }
-
+        var moodList = moods?.ToList();
+        if (moodList != null && moodList.Any())
+            q = q.Where(e => moodList.Contains(e.PrimaryMood));
+        var tagIdList = tagIds?.ToList();
+        if (tagIdList != null && tagIdList.Any())
+            q = q.Where(e => e.EntryTags.Any(et => tagIdList.Contains(et.TagId)));
         if (categoryId.HasValue)
-        {
             q = q.Where(e => e.CategoryId == categoryId.Value);
-        }
-
         return q;
     }
 
@@ -199,40 +189,35 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     #region Date Helpers
 
-    public async Task<IList<DateTime>> GetDatesWithEntriesAsync(int year, int month)
+    public async Task<IList<DateTime>> GetDatesWithEntriesAsync(int year, int month, Guid userId)
     {
         var startDate = new DateTime(year, month, 1);
         var endDate = startDate.AddMonths(1).AddDays(-1);
-
-        return await context.JournalEntries
-            .Where(e => e.EntryDate >= startDate && e.EntryDate <= endDate)
-            .Select(e => e.EntryDate.Date)
-            .Distinct()
-            .ToListAsync();
+        var q = context.JournalEntries.Where(e => e.EntryDate >= startDate && e.EntryDate <= endDate);
+        q = q.Where(e => e.UserId == userId);
+        return await q.Select(e => e.EntryDate.Date).Distinct().ToListAsync();
     }
 
-    public async Task<bool> HasEntryForDateAsync(DateTime date)
+    public async Task<bool> HasEntryForDateAsync(DateTime date, Guid userId)
     {
         var dateOnly = date.Date;
-        return await context.JournalEntries.AnyAsync(e => e.EntryDate.Date == dateOnly);
+        var q = context.JournalEntries.Where(e => e.EntryDate.Date == dateOnly);
+        q = q.Where(e => e.UserId == userId);
+        return await q.AnyAsync();
     }
 
-    public async Task<int> GetTotalEntriesCountAsync()
+    public async Task<int> GetTotalEntriesCountAsync(Guid userId)
     {
-        return await context.JournalEntries.CountAsync();
+        var q = context.JournalEntries.AsQueryable();
+        q = q.Where(e => e.UserId == userId);
+        return await q.CountAsync();
     }
 
-    #endregion
-
-    #region Streak Helpers
-
-    public async Task<IList<DateTime>> GetAllEntryDatesOrderedAsync()
+    public async Task<IList<DateTime>> GetAllEntryDatesOrderedAsync(Guid userId)
     {
-        return await context.JournalEntries
-            .Select(e => e.EntryDate.Date)
-            .Distinct()
-            .OrderByDescending(d => d)
-            .ToListAsync();
+        var q = context.JournalEntries.AsQueryable();
+        q = q.Where(e => e.UserId == userId);
+        return await q.Select(e => e.EntryDate.Date).Distinct().OrderByDescending(d => d).ToListAsync();
     }
 
     #endregion
@@ -387,3 +372,4 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     #endregion
 }
+
