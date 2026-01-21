@@ -111,55 +111,72 @@ else
             </div>
 
             <!-- Pagination -->
-            @if (_searchResult.TotalPages > 1)
+@if (_searchResult.TotalPages > 1)
+{
+    var currentPage = _searchModel.Page;
+    var totalPages = _searchResult.TotalPages;
+
+    var windowSize = 5;
+    var startPage = Math.Max(1, currentPage - windowSize / 2);
+    var endPage = Math.Min(totalPages, startPage + windowSize - 1);
+
+    // Adjust start if we're near the end
+    if (endPage - startPage + 1 < windowSize)
+    {
+        startPage = Math.Max(1, endPage - windowSize + 1);
+    }
+
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+
+            <!-- First -->
+            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                <button class="page-link"
+                        @onclick="() => GoToPage(1)">
+                    First
+                </button>
+            </li>
+
+            <!-- Previous -->
+            <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                <button class="page-link"
+                        @onclick="() => GoToPage(currentPage - 1)">
+                    Previous
+                </button>
+            </li>
+
+            <!-- Page Numbers -->
+            @for (int i = startPage; i <= endPage; i++)
             {
-                var currentPage = _searchModel.Page;
-                var totalPages = _searchResult.TotalPages;
-
-                var windowSize = 5;
-                var startPage = Math.Max(1, currentPage - windowSize / 2);
-                var endPage = Math.Min(totalPages, startPage + windowSize - 1);
-
-                // Adjust start if we're near the end
-                if (endPage - startPage + 1 < windowSize)
-                {
-                    startPage = Math.Max(1, endPage - windowSize + 1);
-                }
-
-                <nav class="mt-4">
-                    <ul class="pagination justify-content-center">
-
-                        <!-- Previous -->
-                        <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
-                            <button class="page-link"
-                                    @onclick="() => GoToPage(currentPage - 1)">
-                                Previous
-                            </button>
-                        </li>
-
-                        <!-- Page Numbers -->
-                        @for (int i = startPage; i <= endPage; i++)
-                        {
-                            var pageNum = i;
-                            <li class="page-item @(currentPage == pageNum ? "active" : "")">
-                                <button class="page-link"
-                                        @onclick="() => GoToPage(pageNum)">
-                                    @pageNum
-                                </button>
-                            </li>
-                        }
-
-                        <!-- Next -->
-                        <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
-                            <button class="page-link"
-                                    @onclick="() => GoToPage(currentPage + 1)">
-                                Next
-                            </button>
-                        </li>
-
-                    </ul>
-                </nav>
+                var pageNum = i;
+                <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                    <button class="page-link"
+                            @onclick="() => GoToPage(pageNum)">
+                        @pageNum
+                    </button>
+                </li>
             }
+
+            <!-- Next -->
+            <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                <button class="page-link"
+                        @onclick="() => GoToPage(currentPage + 1)">
+                    Next
+                </button>
+            </li>
+
+            <!-- Last -->
+            <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                <button class="page-link"
+                        @onclick="() => GoToPage(totalPages)">
+                    Last
+                </button>
+            </li>
+
+        </ul>
+    </nav>
+}
+
 
         }
         else
