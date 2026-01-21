@@ -9,15 +9,10 @@ Key points
 - **Purpose:** Demonstrates layered architecture, EF Core migrations, and a MAUI UI.
 
 Quick start (macOS)
-- Restore and build solution:
+- Restore and build solution (use IDE or):
 
-  dotnet restore
-  dotnet build
-
-- Apply EF migrations (requires `dotnet-ef`):
-
-  dotnet tool install --global dotnet-ef
-  dotnet ef database update --project Infrastructure
+  - dotnet restore
+  - dotnet build
 
 - Run the MAUI app (use IDE or):
 
@@ -31,5 +26,4 @@ Repository layout
 
 Notes
 - The MAUI project targets MacCatalyst for macOS development.
-- Adjust the `--startup-project` in EF commands if running migrations from a different host project.
 
