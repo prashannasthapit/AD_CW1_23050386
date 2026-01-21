@@ -113,24 +113,54 @@ else
             <!-- Pagination -->
             @if (_searchResult.TotalPages > 1)
             {
+                var currentPage = _searchModel.Page;
+                var totalPages = _searchResult.TotalPages;
+
+                var windowSize = 5;
+                var startPage = Math.Max(1, currentPage - windowSize / 2);
+                var endPage = Math.Min(totalPages, startPage + windowSize - 1);
+
+                // Adjust start if we're near the end
+                if (endPage - startPage + 1 < windowSize)
+                {
+                    startPage = Math.Max(1, endPage - windowSize + 1);
+                }
+
                 <nav class="mt-4">
                     <ul class="pagination justify-content-center">
-                        <li class="page-item @(_searchModel.Page <= 1 ? "disabled" : "")">
-                            <button class="page-link" @onclick="() => GoToPage(_searchModel.Page - 1)">Previous</button>
+
+                        <!-- Previous -->
+                        <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                            <button class="page-link"
+                                    @onclick="() => GoToPage(currentPage - 1)">
+                                Previous
+                            </button>
                         </li>
-                        @for (int i = 1; i <= Math.Min(_searchResult.TotalPages, 5); i++)
+
+                        <!-- Page Numbers -->
+                        @for (int i = startPage; i <= endPage; i++)
                         {
                             var pageNum = i;
-                            <li class="page-item @(_searchModel.Page == pageNum ? "active" : "")">
-                                <button class="page-link" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                            <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                                <button class="page-link"
+                                        @onclick="() => GoToPage(pageNum)">
+                                    @pageNum
+                                </button>
                             </li>
                         }
-                        <li class="page-item @(_searchModel.Page >= _searchResult.TotalPages ? "disabled" : "")">
-                            <button class="page-link" @onclick="() => GoToPage(_searchModel.Page + 1)">Next</button>
+
+                        <!-- Next -->
+                        <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                            <button class="page-link"
+                                    @onclick="() => GoToPage(currentPage + 1)">
+                                Next
+                            </button>
                         </li>
+
                     </ul>
                 </nav>
             }
+
         }
         else
         {
@@ -143,7 +173,7 @@ else
 }
 
 @code {
-    private JournalSearchModel _searchModel = new() { PageSize = 10 };
+    private JournalSearchModel _searchModel = new() { PageSize = 5 };
     private JournalSearchResultModel _searchResult = new();
     private DateTime? _fromDate;
     private DateTime? _toDate;
