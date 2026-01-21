@@ -1,8 +1,6 @@
 @page "/analytics"
 @inject IJournalService JournalService
 @inject IUserService UserService
-@inject IJSRuntime JS
-@inject IPdfService PdfService
 @using Domain.Entities
 
 <script src="js/pdfUtils.js"></script>
@@ -57,10 +55,7 @@ else
                 </div>
             </div>
         </div>
-        <!-- Export to PDF Button -->
-        @* <button class="btn btn-outline-secondary mb-3" @onclick="ExportToPdf">Export to PDF</button> *@
-        <button class="btn btn-outline-secondary mb-3" @onclick="ExportJournalsToPdf">Export Filtered Journals to PDF</button>
-
+        
         <!-- Date Range Filter -->
         <div class="card mb-4">
             <div class="card-header">
@@ -381,141 +376,5 @@ else
         _toDate = DateTime.Today;
         _fromDate = DateTime.Today.AddDays(-30);
         await LoadAnalytics();
-    }
-
-    private async Task ExportToPdf()
-    {
-        Console.WriteLine("Exporting analytics to PDF...");
-        try
-        {
-            // var html = await JS.InvokeAsync<string>("eval", "document.documentElement.outerHTML");
-            string html = await JS.InvokeAsync<string>("getPageHtmlWithStyles");
-
-            // Base app sandbox folder
-            var appData = FileSystem.Current.AppDataDirectory;
-
-// Create "JournalExports" subfolder
-            var exportFolder = Path.Combine(appData, "JournalExports");
-            Directory.CreateDirectory(exportFolder); // ensures folder exists
-
-// Create a timestamped PDF file path
-            var filePath = Path.Combine(exportFolder, $"Export-{DateTime.Now:yyyyMMddHHmmss}.pdf");
-
-            await PdfService.GeneratePdfAsync(html, filePath);
-
-// Best approach: prepend "file://"
-            var fileUri = new Uri($"file://{filePath}");
-
-            await Launcher.Default.OpenAsync(fileUri);
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
-    }
-
-    private async Task ExportJournalsToPdf()
-    {
-        try
-        {
-            var searchModel = new JournalSearchModel
-            {
-                Query = null,
-                From = _fromDate,
-                To = _toDate,
-                Moods = null,
-                TagIds = null,
-                CategoryId = null,
-                Page = 1,
-                PageSize = 1000
-            };
-            var result = await JournalService.SearchAsync(searchModel);
-            if (!result.Success || result.Data == null || result.Data.Entries.Count == 0)
-            {
-                await JS.InvokeVoidAsync("alert", "No journals found for the selected filter.");
-                return;
-            }
-
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("<html><head><title>Exported Journals</title>");
-            sb.AppendLine("<link rel='stylesheet' href='/css/bootstrap.min.css'>");
-            sb.AppendLine("<style>@media print { .page-break { page-break-before: always; } }</style>");
-            sb.AppendLine("</head><body>");
-
-            foreach (var entry in result.Data.Entries)
-            {
-                // Secondary moods
-                string secondaryMoodsHtml = "";
-                if (entry.SecondaryMoods != null && entry.SecondaryMoods.Count > 0)
-                {
-                    foreach (var m in entry.SecondaryMoods)
-                    {
-                        secondaryMoodsHtml += $"<span class='badge bg-secondary ms-1'>{m.GetEmoji()} {m}</span> ";
-                    }
-                }
-                // Tags
-                string tagsHtml = "";
-                if (entry.Tags != null && entry.Tags.Count > 0)
-                {
-                    foreach (var tag in entry.Tags)
-                    {
-                        tagsHtml += $"<span class='badge bg-info text-dark'>{tag.Name}</span> ";
-                    }
-                }
-                // Updated at
-                string updatedAtHtml = entry.UpdatedAt != entry.CreatedAt
-                    ? $"<div class='mb-2'><strong>Last Updated:</strong> {entry.UpdatedAt}</div>"
-                    : "";
-
-                sb.AppendLine($@"
-<div class='container mt-4'>
-    <div class='card mb-4'>
-        <div class='card-header'>
-            <h4>{entry.Title}</h4>
-            <small class='text-muted'>{entry.EntryDate:dddd, MMMM d, yyyy}</small>
-        </div>
-        <div class='card-body'>
-            <div class='mb-2'>
-                <span class='badge' style='background-color: {entry.PrimaryMoodCategory.GetCategoryColor()};'>{entry.PrimaryMood.GetEmoji()} {entry.PrimaryMood}</span>
-                {secondaryMoodsHtml}
-            </div>
-            <div class='mb-2'>
-                {tagsHtml}
-            </div>
-            <div class='mb-2'><strong>Word Count:</strong> {entry.WordCount}</div>
-            <div class='mb-2'><strong>Created:</strong> {entry.CreatedAt}</div>
-            {updatedAtHtml}
-            <div class='mt-3' id='journal-content'>{entry.Content}</div>
-        </div>
-    </div>
-</div>
-<div class='page-break'></div>");
-            }
-            sb.AppendLine("</body></html>");
-            var html = sb.ToString();
-            
-            
-            // Base app sandbox folder
-            var appData = FileSystem.Current.AppDataDirectory;
-
-// Create "JournalExports" subfolder
-            var exportFolder = Path.Combine(appData, "JournalExports");
-            Directory.CreateDirectory(exportFolder); // ensures folder exists
-
-// Create a timestamped PDF file path
-            var filePath = Path.Combine(exportFolder, $"Export-{DateTime.Now:yyyyMMddHHmmss}.pdf");
-
-            await PdfService.GeneratePdfAsync(html, filePath);
-
-// Best approach: prepend "file://"
-            var fileUri = new Uri($"file://{filePath}");
-
-            await Launcher.Default.OpenAsync(fileUri);
-        }
-        catch (Exception ex)
-        {
-            await JS.InvokeVoidAsync("alert", $"Export failed: {ex.Message}");
-        }
     }
 }
