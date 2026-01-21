@@ -365,21 +365,23 @@ public class JournalService : IJournalService
     {
         try
         {
-            var moodCounts = await dbAccess.GetMoodCountsAsync(from, to);
-            
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<MoodDistributionModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var moodCounts = await dbAccess.GetMoodCountsAsync(from, to, userId);
             var categoryDistribution = new Dictionary<MoodCategory, int>
             {
                 { MoodCategory.Positive, 0 },
                 { MoodCategory.Neutral, 0 },
                 { MoodCategory.Negative, 0 }
             };
-
             foreach (var (mood, count) in moodCounts)
             {
                 var category = mood.GetCategory();
                 categoryDistribution[category] += count;
             }
-
             var result = new MoodDistributionModel
             {
                 MoodCounts = moodCounts.ToDictionary(m => m.Mood, m => m.Count),
@@ -388,7 +390,6 @@ public class JournalService : IJournalService
                     ? moodCounts.OrderByDescending(m => m.Count).First().Mood 
                     : null
             };
-
             return ServiceResult<MoodDistributionModel>.Ok(result);
         }
         catch (Exception ex)
@@ -405,12 +406,16 @@ public class JournalService : IJournalService
     {
         try
         {
-            var tagCounts = await dbAccess.GetTagUsageCountsAsync(from, to, topN);
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<TagUsageModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var tagCounts = await dbAccess.GetTagUsageCountsAsync(from, to, topN, userId);
             var result = new TagUsageModel
             {
                 TagCounts = tagCounts.ToDictionary(t => t.TagName, t => t.Count)
             };
-
             return ServiceResult<TagUsageModel>.Ok(result);
         }
         catch (Exception ex)
@@ -427,11 +432,15 @@ public class JournalService : IJournalService
     {
         try
         {
-            var wordCounts = await dbAccess.GetWordCountsByDateAsync(from, to);
+            var currentUser = await _userService.GetCurrentUserAsync();
+            if (!currentUser.Success || currentUser.Data == null)
+                return ServiceResult<WordCountTrendModel>.Fail("No user logged in.");
+            var userId = currentUser.Data.Id;
+
+            var wordCounts = await dbAccess.GetWordCountsByDateAsync(from, to, userId);
             var dailyCounts = wordCounts.ToDictionary(w => w.Date, w => w.WordCount);
             var totalWords = dailyCounts.Values.Sum();
             var dayCount = dailyCounts.Count > 0 ? dailyCounts.Count : 1;
-
             var result = new WordCountTrendModel
             {
                 DailyWordCounts = dailyCounts,

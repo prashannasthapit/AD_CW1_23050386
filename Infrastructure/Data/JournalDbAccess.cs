@@ -224,20 +224,18 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     #region Mood Queries
 
-    public async Task<IList<(Mood Mood, int Count)>> GetMoodCountsAsync(DateTime? from, DateTime? to)
+    public async Task<IList<(Mood Mood, int Count)>> GetMoodCountsAsync(DateTime? from, DateTime? to, Guid userId)
     {
         IQueryable<JournalEntry> q = context.JournalEntries;
-
+        q = q.Where(e => e.UserId == userId);
         if (from.HasValue)
             q = q.Where(e => e.EntryDate >= from.Value.Date);
         if (to.HasValue)
             q = q.Where(e => e.EntryDate <= to.Value.Date);
-
         var result = await q
             .GroupBy(e => e.PrimaryMood)
             .Select(g => new { Mood = g.Key, Count = g.Count() })
             .ToListAsync();
-
         return result.Select(r => (r.Mood, r.Count)).ToList();
     }
 
@@ -245,24 +243,22 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     #region Tag Queries
 
-    public async Task<IList<(string TagName, int Count)>> GetTagUsageCountsAsync(DateTime? from, DateTime? to, int topN)
+    public async Task<IList<(string TagName, int Count)>> GetTagUsageCountsAsync(DateTime? from, DateTime? to, int topN, Guid userId)
     {
         IQueryable<EntryTag> q = context.EntryTags;
-
+        q = q.Where(et => et.JournalEntry.UserId == userId);
         if (from.HasValue || to.HasValue)
         {
             q = q.Where(et =>
                 (!from.HasValue || et.JournalEntry.EntryDate >= from.Value.Date) &&
                 (!to.HasValue || et.JournalEntry.EntryDate <= to.Value.Date));
         }
-
         var result = await q
             .GroupBy(et => et.Tag.Name)
             .Select(g => new { TagName = g.Key, Count = g.Count() })
             .OrderByDescending(x => x.Count)
             .Take(topN)
             .ToListAsync();
-
         return result.Select(r => (r.TagName, r.Count)).ToList();
     }
 
@@ -270,14 +266,12 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     #region Word Count Queries
 
-    public async Task<IList<(DateTime Date, int WordCount)>> GetWordCountsByDateAsync(DateTime from, DateTime to)
+    public async Task<IList<(DateTime Date, int WordCount)>> GetWordCountsByDateAsync(DateTime from, DateTime to, Guid userId)
     {
-        // Since WordCount is a NotMapped property, we need to compute it in memory
         var entries = await context.JournalEntries
-            .Where(e => e.EntryDate >= from.Date && e.EntryDate <= to.Date)
+            .Where(e => e.EntryDate >= from.Date && e.EntryDate <= to.Date && e.UserId == userId)
             .Select(e => new { e.EntryDate, e.Content })
             .ToListAsync();
-
         return entries
             .Select(e => (
                 e.EntryDate.Date,

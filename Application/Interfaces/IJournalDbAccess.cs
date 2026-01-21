@@ -49,13 +49,13 @@ public interface IJournalDbAccess
     Task<IList<DateTime>> GetAllEntryDatesOrderedAsync(Guid userId);
     
     // Mood queries
-    Task<IList<(Mood Mood, int Count)>> GetMoodCountsAsync(DateTime? from, DateTime? to);
+    Task<IList<(Mood Mood, int Count)>> GetMoodCountsAsync(DateTime? from, DateTime? to, Guid userId);
     
     // Tag queries
-    Task<IList<(string TagName, int Count)>> GetTagUsageCountsAsync(DateTime? from, DateTime? to, int topN);
+    Task<IList<(string TagName, int Count)>> GetTagUsageCountsAsync(DateTime? from, DateTime? to, int topN, Guid userId);
     
     // Word count queries
-    Task<IList<(DateTime Date, int WordCount)>> GetWordCountsByDateAsync(DateTime from, DateTime to);
+    Task<IList<(DateTime Date, int WordCount)>> GetWordCountsByDateAsync(DateTime from, DateTime to, Guid userId);
     
     // Category CRUD
     Task<IList<Category>> GetAllCategoriesAsync();
