@@ -4,11 +4,9 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup Label="For MAUI.">
-    <PackageVersion Include="Markdig" Version="0.44.0" />
     <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
-    <PackageVersion Include="MudBlazor" Version="8.15.0" />
     <PackageVersion Include="PdfSharpCore" Version="1.3.67" />
     <PackageVersion Include="Polybioz.HtmlRenderer.PdfSharp.Core" Version="1.1.0" />
   </ItemGroup>
