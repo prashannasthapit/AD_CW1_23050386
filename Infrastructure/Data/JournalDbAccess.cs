@@ -10,7 +10,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<User?> GetUserByUsernameAsync(string username)
     {
-        return await context.Users
+        return await context.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Username == username);
     }
 
@@ -51,12 +51,12 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<User?> GetDefaultUserAsync()
     {
-        return await context.Users.FirstOrDefaultAsync();
+        return await context.Users.AsNoTracking().FirstOrDefaultAsync();
     }
 
     public async Task<IList<User>> GetAllUsersAsync()
     {
-        return await context.Users.OrderBy(u => u.Username).ToListAsync();
+        return await context.Users.AsNoTracking().OrderBy(u => u.Username).ToListAsync();
     }
 
     #endregion
@@ -65,7 +65,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<JournalEntry?> GetEntryByIdAsync(Guid id)
     {
-        return await context.JournalEntries
+        return await context.JournalEntries.AsNoTracking()
             .Include(e => e.Category)
             .Include(e => e.EntryTags)
                 .ThenInclude(et => et.Tag)
@@ -77,7 +77,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
         var dateOnly = date.Date;
         // if (userId)
         // {
-            return await context.JournalEntries
+            return await context.JournalEntries.AsNoTracking()
                 .Include(e => e.Category)
                 .Include(e => e.EntryTags)
                     .ThenInclude(et => et.Tag)
@@ -134,7 +134,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
         Guid userId)
     {
         var q = BuildEntriesQuery(query, from, to, moods, tagIds, categoryId, userId);
-        return await q
+        return await q.AsNoTracking()
             .OrderByDescending(e => e.EntryDate)
             .Skip(skip)
             .Take(take)
@@ -193,7 +193,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
     {
         var startDate = new DateTime(year, month, 1);
         var endDate = startDate.AddMonths(1).AddDays(-1);
-        var q = context.JournalEntries.Where(e => e.EntryDate >= startDate && e.EntryDate <= endDate);
+        var q = context.JournalEntries.AsNoTracking().Where(e => e.EntryDate >= startDate && e.EntryDate <= endDate);
         q = q.Where(e => e.UserId == userId);
         return await q.Select(e => e.EntryDate.Date).Distinct().ToListAsync();
     }
@@ -201,21 +201,21 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
     public async Task<bool> HasEntryForDateAsync(DateTime date, Guid userId)
     {
         var dateOnly = date.Date;
-        var q = context.JournalEntries.Where(e => e.EntryDate.Date == dateOnly);
+        var q = context.JournalEntries.AsNoTracking().Where(e => e.EntryDate.Date == dateOnly);
         q = q.Where(e => e.UserId == userId);
         return await q.AnyAsync();
     }
 
     public async Task<int> GetTotalEntriesCountAsync(Guid userId)
     {
-        var q = context.JournalEntries.AsQueryable();
+        var q = context.JournalEntries.AsNoTracking().AsQueryable();
         q = q.Where(e => e.UserId == userId);
         return await q.CountAsync();
     }
 
     public async Task<IList<DateTime>> GetAllEntryDatesOrderedAsync(Guid userId)
     {
-        var q = context.JournalEntries.AsQueryable();
+        var q = context.JournalEntries.AsNoTracking().AsQueryable();
         q = q.Where(e => e.UserId == userId);
         return await q.Select(e => e.EntryDate.Date).Distinct().OrderByDescending(d => d).ToListAsync();
     }
@@ -253,7 +253,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
                 (!from.HasValue || et.JournalEntry.EntryDate >= from.Value.Date) &&
                 (!to.HasValue || et.JournalEntry.EntryDate <= to.Value.Date));
         }
-        var result = await q
+        var result = await q.AsNoTracking()
             .GroupBy(et => et.Tag.Name)
             .Select(g => new { TagName = g.Key, Count = g.Count() })
             .OrderByDescending(x => x.Count)
@@ -268,7 +268,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<IList<(DateTime Date, int WordCount)>> GetWordCountsByDateAsync(DateTime from, DateTime to, Guid userId)
     {
-        var entries = await context.JournalEntries
+        var entries = await context.JournalEntries.AsNoTracking()
             .Where(e => e.EntryDate >= from.Date && e.EntryDate <= to.Date && e.UserId == userId)
             .Select(e => new { e.EntryDate, e.Content })
             .ToListAsync();
@@ -288,7 +288,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<IList<Category>> GetAllCategoriesAsync()
     {
-        return await context.Categories.OrderBy(c => c.Name).ToListAsync();
+        return await context.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
     }
 
     public async Task<Category?> GetCategoryByIdAsync(Guid id)
@@ -326,12 +326,12 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<IList<Tag>> GetAllTagsAsync()
     {
-        return await context.Tags.OrderBy(t => t.Name).ToListAsync();
+        return await context.Tags.AsNoTracking().OrderBy(t => t.Name).ToListAsync();
     }
 
     public async Task<IList<Tag>> GetPrebuiltTagsAsync()
     {
-        return await context.Tags
+        return await context.Tags.AsNoTracking()
             .Where(t => t.IsPrebuilt)
             .OrderBy(t => t.Name)
             .ToListAsync();
@@ -339,7 +339,7 @@ public class JournalDbAccess(JournalDbContext context) : IJournalDbAccess
 
     public async Task<Tag?> GetTagByNameAsync(string name)
     {
-        return await context.Tags.FirstOrDefaultAsync(t => t.Name == name);
+        return await context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Name == name);
     }
 
     public async Task<Tag> AddTagAsync(Tag tag)

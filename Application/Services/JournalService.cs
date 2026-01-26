@@ -100,7 +100,7 @@ public class JournalService : IJournalService
             entry.UserId = userId;
             entry = await dbAccess.AddEntryAsync(entry);
             
-            if (model.TagIds != null && model.TagIds.Count > 0)
+            if (model.TagIds != null && model.TagIds.Any())
             {
                 await UpdateEntryTags(entry, model.TagIds);
                 entry = (await dbAccess.GetEntryByIdAsync(entry.Id))!;
@@ -386,7 +386,7 @@ public class JournalService : IJournalService
             {
                 MoodCounts = moodCounts.ToDictionary(m => m.Mood, m => m.Count),
                 CategoryCounts = categoryDistribution,
-                MostFrequentMood = moodCounts.Count > 0 
+                MostFrequentMood = moodCounts.Any()
                     ? moodCounts.OrderByDescending(m => m.Count).First().Mood 
                     : null
             };
@@ -440,7 +440,7 @@ public class JournalService : IJournalService
             var wordCounts = await dbAccess.GetWordCountsByDateAsync(from, to, userId);
             var dailyCounts = wordCounts.ToDictionary(w => w.Date, w => w.WordCount);
             var totalWords = dailyCounts.Values.Sum();
-            var dayCount = dailyCounts.Count > 0 ? dailyCounts.Count : 1;
+            var dayCount = dailyCounts.Any() ? dailyCounts.Count : 1;
             var result = new WordCountTrendModel
             {
                 DailyWordCounts = dailyCounts,
