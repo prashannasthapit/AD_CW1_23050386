@@ -19,4 +19,6 @@ public class User
     [MaxLength(20)] public string Theme { get; set; } = "Light";
     
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+    
+    public ICollection<JournalEntry> JournalEntries { get; set; } = new List<JournalEntry>();
 }

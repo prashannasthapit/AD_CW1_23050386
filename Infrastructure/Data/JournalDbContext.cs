@@ -31,13 +31,19 @@ public class JournalDbContext : DbContext
         
         // Index on EntryDate to enforce one entry per day: application must ensure uniqueness per date.
         modelBuilder.Entity<JournalEntry>()
-            .HasIndex(j => j.EntryDate)
-            .IsUnique(false); // We'll enforce uniqueness at app level by comparing Date parts.
+            .HasIndex(j => new { j.UserId, j.EntryDate })
+            .IsUnique();
             
         // Configure Tag entity
         modelBuilder.Entity<Tag>()
             .HasIndex(t => t.Name)
             .IsUnique();
+        
+        modelBuilder.Entity<JournalEntry>()
+            .HasOne(j => j.User)
+            .WithMany(u => u.JournalEntries)
+            .HasForeignKey(j => j.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
     
     private readonly string _dbPath;

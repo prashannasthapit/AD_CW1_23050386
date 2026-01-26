@@ -36,6 +36,8 @@ public class JournalEntry
 
     [Required]
     public Guid UserId { get; set; } // The user who owns this entry
+
+    public User User { get; set; } = null!;
     
     [NotMapped]
     public int WordCount => string.IsNullOrWhiteSpace(Content) ? 0 : Content.Split(new[] {' ', '\n', '\r'}, StringSplitOptions.RemoveEmptyEntries).Length;
